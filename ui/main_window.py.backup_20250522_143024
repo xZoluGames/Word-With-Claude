@@ -133,9 +133,14 @@ class ProyectoAcademicoGenerator:
         except Exception as e:
             print(f"❌ Error buscando imágenes base: {e}")
             messagebox.showwarning("⚠️ Imágenes", 
-                f"Error al buscar imágenes base:\n{str(e)}\n\n"
-                f"Coloca las imágenes en: resources/images/\n"
-                f"• Encabezado.png\n• Insignia.png")
+                f"Error al buscar imágenes base:
+{str(e)}
+
+"
+                f"Coloca las imágenes en: resources/images/
+"
+                f"• Encabezado.png
+• Insignia.png")
     
     def get_secciones_iniciales(self):
         """Define las secciones disponibles inicialmente"""
