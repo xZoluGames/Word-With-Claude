@@ -23,7 +23,8 @@ class ProyectoAcademicoGenerator:
         self.root = ctk.CTk()
         self.root.title("🎓 Generador de Proyectos Académicos - Versión Avanzada")
         self.root.geometry("1200x700")
-        
+        from template_manager import obtener_template_manager
+        self.template_manager = obtener_template_manager()
         # Hacer la ventana redimensionable
         self.root.minsize(1000, 600)
         
@@ -82,6 +83,15 @@ class ProyectoAcademicoGenerator:
         # Iniciar estadísticas y auto-guardado
         self.actualizar_estadisticas()
         self.project_manager.auto_save_project(self)
+    def cargar_documento_base(self):
+        """Carga el documento base usando template_manager"""
+        from template_manager import aplicar_plantilla_tercer_ano
+        aplicar_plantilla_tercer_ano(self)
+
+    def gestionar_plantillas(self):
+        """Abre el gestor de plantillas avanzado"""
+        from template_manager import mostrar_gestor_plantillas
+        mostrar_gestor_plantillas(self)
     
     def buscar_imagenes_base(self):
         """Busca imágenes base en la carpeta Recursos"""
