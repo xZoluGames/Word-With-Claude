@@ -140,7 +140,7 @@ class DocumentGenerator:
         return titulo_style
     
     def crear_portada_profesional(self, doc, app_instance):
-        """Crea portada profesional con formato de texto mejorado y negrita"""
+        """Crea portada profesional con imágenes y formato avanzado"""
         # Logo/emblema si existe
         ruta_imagen = self.obtener_ruta_imagen("insignia", app_instance)
         if ruta_imagen and os.path.exists(ruta_imagen):
@@ -149,25 +149,20 @@ class DocumentGenerator:
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 run = p.add_run()
                 run.add_picture(ruta_imagen, width=Inches(1.5))
-            except Exception as e:
-                print(f"Error cargando insignia: {e}")
+            except:
                 p = doc.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = p.add_run("LOGO/EMBLEMA DE LA INSTITUCIÓN")
-                run.bold = True
-                run.font.size = Pt(14)
+                p.add_run("LOGO/EMBLEMA DE LA INSTITUCIÓN").bold = True
         else:
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run("LOGO/EMBLEMA DE LA INSTITUCIÓN")
-            run.bold = True
-            run.font.size = Pt(14)
+            p.add_run("LOGO/EMBLEMA DE LA INSTITUCIÓN").bold = True
         
         # Espaciado
         doc.add_paragraph()
         doc.add_paragraph()
         
-        # Institución - MEJORADO
+        # Institución
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(app_instance.proyecto_data['institucion'].get().upper())
@@ -177,7 +172,7 @@ class DocumentGenerator:
         
         doc.add_paragraph()
         
-        # Título del proyecto - MEJORADO
+        # Título del proyecto
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(f'"{app_instance.proyecto_data["titulo"].get()}"')
@@ -188,86 +183,47 @@ class DocumentGenerator:
         doc.add_paragraph()
         doc.add_paragraph()
         
-        # Información del proyecto con formato mejorado
-        info_fields = [
-            ('ciclo', 'Ciclo'),
-            ('curso', 'Curso'), 
-            ('enfasis', 'Énfasis'),
-            ('area', 'Área de Desarrollo'),
-            ('categoria', 'Categoría'),
-            ('director', 'Director'),
-            ('responsable', 'Responsable')
-        ]
+        # Información del proyecto
+        info_fields = ['ciclo', 'curso', 'enfasis', 'area', 'categoria', 'director', 'responsable']
+        labels = ['Ciclo', 'Curso', 'Énfasis', 'Área de Desarrollo', 'Categoría', 'Director', 'Responsable']
         
-        for field, label in info_fields:
+        for field, label in zip(info_fields, labels):
             if field in app_instance.proyecto_data and app_instance.proyecto_data[field].get().strip():
                 p = doc.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                
-                # Crear el texto con etiqueta en negrita y valor normal
-                label_run = p.add_run(f"{label}: ")
-                label_run.bold = True
-                label_run.font.name = app_instance.formato_config['fuente_texto']
-                label_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
-                
-                value_run = p.add_run(app_instance.proyecto_data[field].get())
-                value_run.bold = False
-                value_run.font.name = app_instance.formato_config['fuente_texto']
-                value_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+                run = p.add_run(f"{label}: {app_instance.proyecto_data[field].get()}")
+                run.font.name = app_instance.formato_config['fuente_texto']
         
-        # Espaciado adicional
+        # Estudiantes y tutores
         doc.add_paragraph()
         
-        # Estudiantes - MEJORADO
         if app_instance.proyecto_data['estudiantes'].get():
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_run = p.add_run("Estudiantes:")
-            title_run.bold = True
-            title_run.font.name = app_instance.formato_config['fuente_texto']
-            title_run.font.size = Pt(app_instance.formato_config['tamaño_texto'] + 1)
-            
+            p.add_run("Estudiantes:").bold = True
             estudiantes = app_instance.proyecto_data['estudiantes'].get().split(',')
             for estudiante in estudiantes:
                 p = doc.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                student_run = p.add_run(estudiante.strip())
-                student_run.font.name = app_instance.formato_config['fuente_texto']
-                student_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+                p.add_run(estudiante.strip())
         
-        # Tutores - MEJORADO
         if app_instance.proyecto_data['tutores'].get():
-            doc.add_paragraph()  # Espaciado
-            
             p = doc.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_run = p.add_run("Tutores:")
-            title_run.bold = True
-            title_run.font.name = app_instance.formato_config['fuente_texto']
-            title_run.font.size = Pt(app_instance.formato_config['tamaño_texto'] + 1)
-            
+            p.add_run("Tutores:").bold = True
             tutores = app_instance.proyecto_data['tutores'].get().split(',')
             for tutor in tutores:
                 p = doc.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                tutor_run = p.add_run(tutor.strip())
-                tutor_run.font.name = app_instance.formato_config['fuente_texto']
-                tutor_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+                p.add_run(tutor.strip())
         
         doc.add_paragraph()
         doc.add_paragraph()
         
-        # Fecha - MEJORADO
+        # Fecha
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        year_label = p.add_run("Año: ")
-        year_label.bold = True
-        year_label.font.name = app_instance.formato_config['fuente_texto']
-        year_label.font.size = Pt(app_instance.formato_config['tamaño_texto'])
-        
-        year_value = p.add_run(str(datetime.now().year))
-        year_value.font.name = app_instance.formato_config['fuente_texto']
-        year_value.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+        p.add_run(f"Año: {datetime.now().year}")
         
         doc.add_page_break()
     
@@ -433,15 +389,11 @@ facilitar la generación automática del índice."""
         return re.sub(r'\[CITA:[^\]]+\]', reemplazar_cita, texto)
     
     def obtener_ruta_imagen(self, tipo, app_instance):
-        """Obtiene la ruta final de la imagen a usar (personalizada o base) - MEJORADA"""
+        """Obtiene la ruta final de la imagen a usar (personalizada o base)"""
         if tipo == "encabezado":
-            # Prioridad: personalizada -> base
-            return (getattr(app_instance, 'encabezado_personalizado', None) or 
-                   getattr(app_instance, 'ruta_encabezado', None))
+            return getattr(app_instance, 'encabezado_personalizado', None) or getattr(app_instance, 'ruta_encabezado', None)
         elif tipo == "insignia":
-            # Prioridad: personalizada -> base
-            return (getattr(app_instance, 'insignia_personalizada', None) or 
-                   getattr(app_instance, 'ruta_insignia', None))
+            return getattr(app_instance, 'insignia_personalizada', None) or getattr(app_instance, 'ruta_insignia', None)
         return None
     
     def mostrar_mensaje_exito(self, filename, app_instance):

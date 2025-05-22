@@ -94,53 +94,24 @@ class ProyectoAcademicoGenerator:
         mostrar_gestor_plantillas(self)
     
     def buscar_imagenes_base(self):
-        """Busca imágenes base en la carpeta resources/images"""
+        """Busca imágenes base en la carpeta Recursos"""
         try:
             script_dir = os.path.dirname(os.path.abspath(__file__))
-            # Actualizar ruta a resources/images
-            recursos_dir = os.path.join(script_dir, "..", "resources", "images")
+            recursos_dir = os.path.join(script_dir, "..", "Recursos")
             recursos_dir = os.path.normpath(recursos_dir)
             
-            print(f"🔍 Buscando imágenes en: {recursos_dir}")
+            # Buscar encabezado
+            encabezado_path = os.path.join(recursos_dir, "Encabezado.png")
+            if os.path.exists(encabezado_path):
+                self.ruta_encabezado = encabezado_path
             
-            # Crear directorio si no existe
-            if not os.path.exists(recursos_dir):
-                os.makedirs(recursos_dir)
-                print(f"📁 Directorio creado: {recursos_dir}")
-            
-            # Buscar encabezado con múltiples extensiones
-            encabezado_extensions = ['Encabezado.png', 'Encabezado.jpg', 'Encabezado.jpeg', 'encabezado.png']
-            for filename in encabezado_extensions:
-                encabezado_path = os.path.join(recursos_dir, filename)
-                if os.path.exists(encabezado_path):
-                    self.ruta_encabezado = encabezado_path
-                    print(f"✅ Encabezado encontrado: {filename}")
-                    break
-            else:
-                print("⚠️ Encabezado.png no encontrado en resources/images")
-            
-            # Buscar insignia con múltiples extensiones
-            insignia_extensions = ['Insignia.png', 'Insignia.jpg', 'Insignia.jpeg', 'insignia.png']
-            for filename in insignia_extensions:
-                insignia_path = os.path.join(recursos_dir, filename)
-                if os.path.exists(insignia_path):
-                    self.ruta_insignia = insignia_path
-                    print(f"✅ Insignia encontrada: {filename}")
-                    break
-            else:
-                print("⚠️ Insignia.png no encontrada en resources/images")
+            # Buscar insignia
+            insignia_path = os.path.join(recursos_dir, "Insignia.png")
+            if os.path.exists(insignia_path):
+                self.ruta_insignia = insignia_path
                 
         except Exception as e:
-            print(f"❌ Error buscando imágenes base: {e}")
-            messagebox.showwarning("⚠️ Imágenes", 
-                f"Error al buscar imágenes base:
-{str(e)}
-
-"
-                f"Coloca las imágenes en: resources/images/
-"
-                f"• Encabezado.png
-• Insignia.png")
+            print(f"Error buscando imágenes base: {e}")
     
     def get_secciones_iniciales(self):
         """Define las secciones disponibles inicialmente"""

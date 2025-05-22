@@ -4,7 +4,6 @@ Validador de proyectos - Valida completitud y calidad del proyecto académico
 
 import re
 from tkinter import messagebox
-from datetime import datetime
 
 class ProjectValidator:
     def __init__(self):
@@ -19,7 +18,6 @@ class ProjectValidator:
         app_instance.validation_text.delete("1.0", "end")
         errores = []
         advertencias = []
-        sugerencias = []
         
         # Validar información general
         for campo in self.criterios_validacion['campos_requeridos']:
@@ -140,33 +138,6 @@ class ProjectValidator:
                     total_palabras += palabras
         return total_palabras
     
-
-    def _validar_imagenes(self, app_instance, advertencias, sugerencias):
-        """Valida disponibilidad y calidad de imágenes"""
-        enc_activo = (getattr(app_instance, 'encabezado_personalizado', None) or 
-                     getattr(app_instance, 'ruta_encabezado', None))
-        ins_activo = (getattr(app_instance, 'insignia_personalizada', None) or 
-                     getattr(app_instance, 'ruta_insignia', None))
-        
-        if not enc_activo and not ins_activo:
-            advertencias.append("⚠️ No hay imágenes configuradas (encabezado/insignia)")
-        elif not enc_activo:
-            sugerencias.append("💡 Considera agregar imagen de encabezado")
-        elif not ins_activo:
-            sugerencias.append("💡 Considera agregar imagen de insignia")
-
-    def _validar_formato_referencias(self, referencias, advertencias):
-        """Valida formato APA básico en referencias"""
-        for i, ref in enumerate(referencias, 1):
-            # Validar formato básico de autor
-            if not re.match(r'^[A-ZÁ-Ž].*,\s*[A-Z]\.', ref.get('autor', '')):
-                advertencias.append(f"⚠️ Referencia {i}: Formato de autor incorrecto (usar: Apellido, N.)")
-            
-            # Validar año
-            año = ref.get('año', '')
-            if not año.isdigit() or not (1900 <= int(año) <= datetime.now().year + 1):
-                advertencias.append(f"⚠️ Referencia {i}: Año inválido ({año})")
-
     def validacion_rapida(self, app_instance):
         """Validación rápida para estadísticas en tiempo real"""
         errores_criticos = 0
