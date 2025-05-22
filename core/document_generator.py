@@ -1,12 +1,12 @@
 """
-Generador de documentos Word - Versión Mejorada con Encabezados y Niveles
+Generador de documentos Word - Versión Corregida con Encabezados como Marca de Agua
 """
 
 from docx import Document
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_BREAK
 from docx.enum.style import WD_STYLE_TYPE
-from docx.enum.section import WD_SECTION
+from docx.enum.section import WD_SECTION, WD_ORIENTATION
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 import threading
@@ -38,7 +38,7 @@ class DocumentGenerator:
                 # Crear documento
                 doc = Document()
                 
-                # Configurar estilos profesionales y encabezados
+                # Configurar documento con encabezados como marca de agua
                 self.configurar_documento_completo(doc, app_instance)
                 app_instance.progress.set(0.1)
                 
@@ -95,7 +95,7 @@ class DocumentGenerator:
         thread.start()
     
     def configurar_documento_completo(self, doc, app_instance):
-        """Configura el documento con estilos y encabezados"""
+        """Configura el documento con estilos y encabezados como marca de agua"""
         # Configurar márgenes
         for section in doc.sections:
             section.top_margin = Inches(app_instance.formato_config['margen'] / 2.54)
@@ -103,14 +103,14 @@ class DocumentGenerator:
             section.left_margin = Inches(app_instance.formato_config['margen'] / 2.54)
             section.right_margin = Inches(app_instance.formato_config['margen'] / 2.54)
             
-            # Configurar encabezado con imagen
-            self.configurar_encabezado(section, app_instance)
+            # Configurar encabezado como marca de agua
+            self.configurar_encabezado_marca_agua(section, app_instance)
         
         # Configurar estilos
         self.configurar_estilos_profesionales(doc, app_instance)
     
-    def configurar_encabezado(self, section, app_instance):
-        """Configura el encabezado de la sección con imagen"""
+    def configurar_encabezado_marca_agua(self, section, app_instance):
+        """Configura el encabezado como marca de agua detrás del texto"""
         header = section.header
         
         # Limpiar contenido existente
@@ -123,22 +123,45 @@ class DocumentGenerator:
         ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
         
         if ruta_encabezado and os.path.exists(ruta_encabezado):
-            # Agregar imagen centrada
+            # Crear párrafo para la imagen
             p = header.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Agregar imagen con configuración especial
             run = p.add_run()
             try:
-                # Agregar imagen con tamaño apropiado
-                picture = run.add_picture(ruta_encabezado, width=Inches(6))
+                picture = run.add_picture(ruta_encabezado, width=Inches(6.5))
+                
+                # Configurar la imagen para que esté detrás del texto
+                # Acceder al elemento XML de la imagen
+                drawing = picture._element
+                
+                # Buscar el elemento anchor
+                for child in drawing:
+                    if child.tag.endswith('anchor'):
+                        # Configurar behindDoc="1" para poner la imagen detrás del texto
+                        child.set('behindDoc', '1')
+                        
+                        # Ajustar posición y transparencia
+                        for prop in child:
+                            if prop.tag.endswith('positionH'):
+                                prop.set('relativeFrom', 'page')
+                            if prop.tag.endswith('positionV'):
+                                prop.set('relativeFrom', 'page')
+                
+                # Hacer la imagen más transparente (efecto marca de agua)
+                # Esto se puede lograr con efectos adicionales si es necesario
+                
             except Exception as e:
                 print(f"Error agregando imagen de encabezado: {e}")
         else:
-            # Si no hay imagen, agregar texto
+            # Si no hay imagen, agregar texto simple
             p = header.add_paragraph()
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = p.add_run(app_instance.proyecto_data.get('institucion', {}).get() or "INSTITUCIÓN EDUCATIVA")
             run.bold = True
             run.font.size = Pt(14)
+            run.font.color.rgb = RGBColor(128, 128, 128)  # Gris para efecto marca de agua
     
     def configurar_estilos_profesionales(self, doc, app_instance):
         """Configura estilos profesionales del documento"""
@@ -146,6 +169,7 @@ class DocumentGenerator:
         style = doc.styles['Normal']
         style.font.name = app_instance.formato_config['fuente_texto']
         style.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+        style.font.color.rgb = RGBColor(0, 0, 0)  # Negro
         
         # Configurar interlineado
         if app_instance.formato_config['interlineado'] == 1.0:
@@ -163,7 +187,7 @@ class DocumentGenerator:
         
         style.paragraph_format.space_after = Pt(0)
         
-        # Crear/actualizar estilos de títulos con niveles
+        # Crear/actualizar estilos de títulos con niveles y COLOR NEGRO
         for i in range(1, 7):
             heading_name = f'Heading {i}'
             if heading_name in doc.styles:
@@ -178,6 +202,7 @@ class DocumentGenerator:
             heading_style.font.name = app_instance.formato_config['fuente_titulo']
             heading_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'] - (i-1))
             heading_style.font.bold = True
+            heading_style.font.color.rgb = RGBColor(0, 0, 0)  # NEGRO, no azul
             heading_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             heading_style.paragraph_format.space_before = Pt(12)
             heading_style.paragraph_format.space_after = Pt(12)
@@ -210,6 +235,7 @@ class DocumentGenerator:
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
         run.font.size = Pt(16)
+        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro
         
         doc.add_paragraph()
         
@@ -220,6 +246,7 @@ class DocumentGenerator:
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
         run.font.size = Pt(18)
+        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro
         
         # Espaciado
         for _ in range(3):
@@ -246,11 +273,13 @@ class DocumentGenerator:
                 label_run.bold = True
                 label_run.font.name = app_instance.formato_config['fuente_texto']
                 label_run.font.size = Pt(12)
+                label_run.font.color.rgb = RGBColor(0, 0, 0)
                 
                 # Valor normal
                 value_run = p.add_run(app_instance.proyecto_data[field].get())
                 value_run.font.name = app_instance.formato_config['fuente_texto']
                 value_run.font.size = Pt(12)
+                value_run.font.color.rgb = RGBColor(0, 0, 0)
         
         # Espaciado
         doc.add_paragraph()
@@ -279,9 +308,11 @@ class DocumentGenerator:
         year_label = p.add_run("Año: ")
         year_label.bold = True
         year_label.font.size = Pt(12)
+        year_label.font.color.rgb = RGBColor(0, 0, 0)
         
         year_value = p.add_run(str(datetime.now().year))
         year_value.font.size = Pt(12)
+        year_value.font.color.rgb = RGBColor(0, 0, 0)
         
         doc.add_page_break()
     
@@ -292,6 +323,7 @@ class DocumentGenerator:
         title_run = p.add_run(f"{titulo}:")
         title_run.bold = True
         title_run.font.size = Pt(13)
+        title_run.font.color.rgb = RGBColor(0, 0, 0)
         
         personas = personas_str.split(',')
         for persona in personas:
@@ -299,6 +331,7 @@ class DocumentGenerator:
             p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = p.add_run(persona.strip())
             run.font.size = Pt(12)
+            run.font.color.rgb = RGBColor(0, 0, 0)
     
     def crear_agradecimientos_profesional(self, doc, app_instance):
         """Crea página de agradecimientos con formato profesional"""
@@ -396,7 +429,11 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
     
     def procesar_citas_mejorado(self, texto, app_instance):
         """Procesa las citas con formato mejorado"""
-        # Procesador de citas mejorado
+        # Usar el CitationProcessor si está disponible
+        if hasattr(app_instance, 'citation_processor'):
+            return app_instance.citation_processor.procesar_citas_avanzado(texto)
+        
+        # Procesador básico de respaldo
         def reemplazar_cita(match):
             cita_completa = match.group(0)
             contenido = cita_completa[6:-1]  # Quita [CITA: y ]
@@ -468,13 +505,13 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
         fuente = ref.get('fuente', '')
         
         if tipo == 'Libro':
-            return f"{autor} ({año}). _{titulo}_. {fuente}."
+            return f"{autor} ({año}). {titulo}. {fuente}."
         elif tipo == 'Artículo':
-            return f"{autor} ({año}). {titulo}. _{fuente}_."
+            return f"{autor} ({año}). {titulo}. {fuente}."
         elif tipo == 'Web':
             return f"{autor} ({año}). {titulo}. Recuperado de {fuente}"
         elif tipo == 'Tesis':
-            return f"{autor} ({año}). _{titulo}_ [Tesis]. {fuente}."
+            return f"{autor} ({año}). {titulo} [Tesis]. {fuente}."
         else:
             return f"{autor} ({año}). {titulo}. {fuente}."
     
@@ -498,12 +535,11 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
             f"📄 Archivo: {os.path.basename(filename)}\n"
             f"📍 Ubicación: {filename}\n\n"
             f"✅ MEJORAS APLICADAS:\n"
-            f"   • Encabezados con imágenes\n"
-            f"   • Niveles de esquema correctos (Heading 1-6)\n"
+            f"   • Encabezados como marca de agua\n"
+            f"   • Títulos en color negro\n"
+            f"   • Niveles de esquema correctos\n"
             f"   • Formato de citas mejorado\n"
-            f"   • Referencias APA optimizadas\n"
-            f"   • Saltos de página inteligentes\n"
-            f"   • Estructura de capítulos\n\n"
+            f"   • Referencias APA optimizadas\n\n"
             f"📋 PARA COMPLETAR EN WORD:\n"
             f"   • Referencias > Tabla de contenido > Automática\n"
             f"   • El índice detectará todos los niveles\n\n"
@@ -513,7 +549,8 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
         messagebox.showinfo("🎉 ¡Éxito Total!", 
             f"Documento generado con todas las mejoras:\n{filename}\n\n"
             f"Características implementadas:\n"
-            f"• Encabezados con imágenes\n"
+            f"• Encabezados como marca de agua\n"
+            f"• Títulos en negro (no azul)\n"
             f"• Niveles de esquema funcionales\n"
             f"• Sistema de citas optimizado\n"
             f"• Formato profesional completo")

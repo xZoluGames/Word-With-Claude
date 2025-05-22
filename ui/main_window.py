@@ -1271,10 +1271,70 @@ class ProyectoAcademicoGenerator:
         else:
             messagebox.showwarning("⚠️ Selección", "Selecciona al menos una sección para eliminar")
     
+    
     def editar_seccion(self):
         """Edita una sección existente"""
-        # Implementar diálogo de edición
-        messagebox.showinfo("🚧 En desarrollo", "Función de edición en desarrollo")
+        # Obtener sección seleccionada
+        secciones_seleccionadas = self.obtener_secciones_seleccionadas()
+        
+        if len(secciones_seleccionadas) != 1:
+            messagebox.showwarning("⚠️ Selección", 
+                "Selecciona exactamente una sección para editar")
+            return
+        
+        idx = secciones_seleccionadas[0]
+        seccion_id = self.secciones_activas[idx]
+        
+        if seccion_id not in self.secciones_disponibles:
+            messagebox.showerror("❌ Error", "Sección no encontrada")
+            return
+        
+        seccion_data = self.secciones_disponibles[seccion_id]
+        
+        # Verificar si es una sección base crítica
+        secciones_no_editables = ['introduccion', 'objetivos', 'marco_teorico', 
+                                  'metodologia', 'conclusiones']
+        
+        if seccion_id in secciones_no_editables and seccion_data.get('base', False):
+            messagebox.showinfo("ℹ️ Información", 
+                "Las secciones base críticas no se pueden editar completamente.\n"
+                "Solo puedes modificar sus instrucciones.")
+            
+            # Permitir edición limitada
+            nueva_instruccion = self.solicitar_nueva_instruccion(seccion_data)
+            if nueva_instruccion:
+                self.secciones_disponibles[seccion_id]['instruccion'] = nueva_instruccion
+                self.actualizar_lista_secciones()
+                self.crear_pestanas_contenido()
+                messagebox.showinfo("✅ Actualizado", 
+                    f"Instrucción de '{seccion_data['titulo']}' actualizada")
+            return
+        
+        # Abrir diálogo de edición
+        dialog = SeccionDialog(self.root, self.secciones_disponibles, 
+                              editar=True, seccion_actual=(seccion_id, seccion_data))
+        
+        if dialog.result:
+            nuevo_id, nuevos_datos = dialog.result
+            
+            # Actualizar sección
+            self.secciones_disponibles[seccion_id].update(nuevos_datos)
+            
+            # Actualizar interfaz
+            self.actualizar_lista_secciones()
+            self.crear_pestanas_contenido()
+            
+            messagebox.showinfo("✅ Actualizada", 
+                f"Sección '{nuevos_datos['titulo']}' actualizada correctamente")
+    
+    def solicitar_nueva_instruccion(self, seccion_data):
+        """Solicita nueva instrucción para una sección"""
+        dialog = ctk.CTkInputDialog(
+            text=f"Nueva instrucción para '{seccion_data['titulo']}':",
+            title="Editar Instrucción"
+        )
+        return dialog.get_input()
+
     
     def subir_seccion(self):
         """Sube una sección en el orden"""
