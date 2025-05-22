@@ -167,22 +167,6 @@ class ProjectValidator:
             if not año.isdigit() or not (1900 <= int(año) <= datetime.now().year + 1):
                 advertencias.append(f"⚠️ Referencia {i}: Año inválido ({año})")
 
-
-    def validar_niveles_esquema(self, app_instance, sugerencias):
-        """Valida que la configuración garantice niveles de esquema correctos"""
-        # Verificar que hay secciones que generarán títulos con nivel de esquema
-        titulos_principales = 0
-        for seccion_id in app_instance.secciones_activas:
-            if seccion_id in app_instance.secciones_disponibles:
-                seccion = app_instance.secciones_disponibles[seccion_id]
-                if seccion.get('capitulo', False) or seccion.get('requerida', False):
-                    titulos_principales += 1
-        
-        if titulos_principales < 3:
-            sugerencias.append("💡 Considera activar más secciones principales para mejor estructura de índice")
-        else:
-            sugerencias.append(f"✅ {titulos_principales} títulos principales configurados para índice automático")
-
     def validacion_rapida(self, app_instance):
         """Validación rápida para estadísticas en tiempo real"""
         errores_criticos = 0
