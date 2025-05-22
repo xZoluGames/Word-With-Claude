@@ -1,11 +1,14 @@
 """
-Generador de documentos Word - Crea documentos profesionales con formato avanzado
+Generador de documentos Word - Versión Mejorada con Encabezados y Niveles
 """
 
 from docx import Document
-from docx.shared import Inches, Pt
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
+from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_BREAK
 from docx.enum.style import WD_STYLE_TYPE
+from docx.enum.section import WD_SECTION
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 import threading
 import os
 from datetime import datetime
@@ -35,8 +38,8 @@ class DocumentGenerator:
                 # Crear documento
                 doc = Document()
                 
-                # Configurar estilos profesionales
-                self.configurar_estilos_profesionales(doc, app_instance)
+                # Configurar estilos profesionales y encabezados
+                self.configurar_documento_completo(doc, app_instance)
                 app_instance.progress.set(0.1)
                 
                 # Generar contenido
@@ -50,7 +53,7 @@ class DocumentGenerator:
                 
                 if 'resumen' in app_instance.secciones_activas and 'resumen' in app_instance.content_texts:
                     contenido_resumen = app_instance.content_texts['resumen'].get("1.0", "end")
-                    self.crear_seccion_profesional(doc, "RESUMEN", contenido_resumen, app_instance)
+                    self.crear_seccion_profesional(doc, "RESUMEN", contenido_resumen, app_instance, nivel=1)
                     app_instance.progress.set(0.4)
                 
                 if app_instance.incluir_indice.get():
@@ -58,7 +61,7 @@ class DocumentGenerator:
                     app_instance.progress.set(0.5)
                 
                 # Contenido principal dinámico
-                self.crear_contenido_dinamico_profesional(doc, app_instance)
+                self.crear_contenido_dinamico_mejorado(doc, app_instance)
                 app_instance.progress.set(0.8)
                 
                 # Referencias
@@ -91,16 +94,54 @@ class DocumentGenerator:
         thread.daemon = True
         thread.start()
     
-    def configurar_estilos_profesionales(self, doc, app_instance):
-        """Configura estilos profesionales del documento"""
+    def configurar_documento_completo(self, doc, app_instance):
+        """Configura el documento con estilos y encabezados"""
         # Configurar márgenes
-        sections = doc.sections
-        for section in sections:
+        for section in doc.sections:
             section.top_margin = Inches(app_instance.formato_config['margen'] / 2.54)
             section.bottom_margin = Inches(app_instance.formato_config['margen'] / 2.54)
             section.left_margin = Inches(app_instance.formato_config['margen'] / 2.54)
             section.right_margin = Inches(app_instance.formato_config['margen'] / 2.54)
+            
+            # Configurar encabezado con imagen
+            self.configurar_encabezado(section, app_instance)
         
+        # Configurar estilos
+        self.configurar_estilos_profesionales(doc, app_instance)
+    
+    def configurar_encabezado(self, section, app_instance):
+        """Configura el encabezado de la sección con imagen"""
+        header = section.header
+        
+        # Limpiar contenido existente
+        for paragraph in header.paragraphs:
+            p = paragraph._element
+            p.getparent().remove(p)
+            p._p = p._element = None
+        
+        # Obtener ruta de imagen de encabezado
+        ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
+        
+        if ruta_encabezado and os.path.exists(ruta_encabezado):
+            # Agregar imagen centrada
+            p = header.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run()
+            try:
+                # Agregar imagen con tamaño apropiado
+                picture = run.add_picture(ruta_encabezado, width=Inches(6))
+            except Exception as e:
+                print(f"Error agregando imagen de encabezado: {e}")
+        else:
+            # Si no hay imagen, agregar texto
+            p = header.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(app_instance.proyecto_data.get('institucion', {}).get() or "INSTITUCIÓN EDUCATIVA")
+            run.bold = True
+            run.font.size = Pt(14)
+    
+    def configurar_estilos_profesionales(self, doc, app_instance):
+        """Configura estilos profesionales del documento"""
         # Estilo normal
         style = doc.styles['Normal']
         style.font.name = app_instance.formato_config['fuente_texto']
@@ -122,25 +163,31 @@ class DocumentGenerator:
         
         style.paragraph_format.space_after = Pt(0)
         
-        # Crear estilo de títulos profesional
-        try:
-            titulo_style = doc.styles.add_style('Titulo Profesional', WD_STYLE_TYPE.PARAGRAPH)
-        except:
-            titulo_style = doc.styles['Heading 1']
-        
-        titulo_style.font.name = app_instance.formato_config['fuente_titulo']
-        titulo_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
-        titulo_style.font.bold = True
-        titulo_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        titulo_style.paragraph_format.space_before = Pt(12)
-        titulo_style.paragraph_format.space_after = Pt(12)
-        titulo_style.paragraph_format.keep_with_next = True
-        titulo_style.paragraph_format.page_break_before = True
-        
-        return titulo_style
+        # Crear/actualizar estilos de títulos con niveles
+        for i in range(1, 7):
+            heading_name = f'Heading {i}'
+            if heading_name in doc.styles:
+                heading_style = doc.styles[heading_name]
+            else:
+                try:
+                    heading_style = doc.styles.add_style(heading_name, WD_STYLE_TYPE.PARAGRAPH)
+                except:
+                    continue
+            
+            # Configurar estilo del título
+            heading_style.font.name = app_instance.formato_config['fuente_titulo']
+            heading_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'] - (i-1))
+            heading_style.font.bold = True
+            heading_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            heading_style.paragraph_format.space_before = Pt(12)
+            heading_style.paragraph_format.space_after = Pt(12)
+            heading_style.paragraph_format.keep_with_next = True
+            
+            # Configurar nivel de esquema
+            heading_style.paragraph_format.outline_level = i - 1
     
     def crear_portada_profesional(self, doc, app_instance):
-        """Crea portada profesional con formato de texto mejorado y negrita"""
+        """Crea portada profesional con formato mejorado"""
         # Logo/emblema si existe
         ruta_imagen = self.obtener_ruta_imagen("insignia", app_instance)
         if ruta_imagen and os.path.exists(ruta_imagen):
@@ -151,44 +198,34 @@ class DocumentGenerator:
                 run.add_picture(ruta_imagen, width=Inches(1.5))
             except Exception as e:
                 print(f"Error cargando insignia: {e}")
-                p = doc.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = p.add_run("LOGO/EMBLEMA DE LA INSTITUCIÓN")
-                run.bold = True
-                run.font.size = Pt(14)
-        else:
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run("LOGO/EMBLEMA DE LA INSTITUCIÓN")
-            run.bold = True
-            run.font.size = Pt(14)
         
         # Espaciado
-        doc.add_paragraph()
-        doc.add_paragraph()
+        for _ in range(3):
+            doc.add_paragraph()
         
-        # Institución - MEJORADO
+        # Institución
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(app_instance.proyecto_data['institucion'].get().upper())
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(app_instance.formato_config['tamaño_titulo'] + 2)
+        run.font.size = Pt(16)
         
         doc.add_paragraph()
         
-        # Título del proyecto - MEJORADO
+        # Título del proyecto
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(f'"{app_instance.proyecto_data["titulo"].get()}"')
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(app_instance.formato_config['tamaño_titulo'] + 4)
+        run.font.size = Pt(18)
         
-        doc.add_paragraph()
-        doc.add_paragraph()
+        # Espaciado
+        for _ in range(3):
+            doc.add_paragraph()
         
-        # Información del proyecto con formato mejorado
+        # Información del proyecto
         info_fields = [
             ('ciclo', 'Ciclo'),
             ('curso', 'Curso'), 
@@ -204,84 +241,70 @@ class DocumentGenerator:
                 p = doc.add_paragraph()
                 p.alignment = WD_ALIGN_PARAGRAPH.CENTER
                 
-                # Crear el texto con etiqueta en negrita y valor normal
+                # Etiqueta en negrita
                 label_run = p.add_run(f"{label}: ")
                 label_run.bold = True
                 label_run.font.name = app_instance.formato_config['fuente_texto']
-                label_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+                label_run.font.size = Pt(12)
                 
+                # Valor normal
                 value_run = p.add_run(app_instance.proyecto_data[field].get())
-                value_run.bold = False
                 value_run.font.name = app_instance.formato_config['fuente_texto']
-                value_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+                value_run.font.size = Pt(12)
         
-        # Espaciado adicional
+        # Espaciado
+        doc.add_paragraph()
         doc.add_paragraph()
         
-        # Estudiantes - MEJORADO
+        # Estudiantes
         if app_instance.proyecto_data['estudiantes'].get():
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_run = p.add_run("Estudiantes:")
-            title_run.bold = True
-            title_run.font.name = app_instance.formato_config['fuente_texto']
-            title_run.font.size = Pt(app_instance.formato_config['tamaño_texto'] + 1)
-            
-            estudiantes = app_instance.proyecto_data['estudiantes'].get().split(',')
-            for estudiante in estudiantes:
-                p = doc.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                student_run = p.add_run(estudiante.strip())
-                student_run.font.name = app_instance.formato_config['fuente_texto']
-                student_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+            self._agregar_lista_personas(doc, "Estudiantes", 
+                                       app_instance.proyecto_data['estudiantes'].get(), 
+                                       app_instance)
         
-        # Tutores - MEJORADO
+        # Tutores
         if app_instance.proyecto_data['tutores'].get():
-            doc.add_paragraph()  # Espaciado
-            
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            title_run = p.add_run("Tutores:")
-            title_run.bold = True
-            title_run.font.name = app_instance.formato_config['fuente_texto']
-            title_run.font.size = Pt(app_instance.formato_config['tamaño_texto'] + 1)
-            
-            tutores = app_instance.proyecto_data['tutores'].get().split(',')
-            for tutor in tutores:
-                p = doc.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                tutor_run = p.add_run(tutor.strip())
-                tutor_run.font.name = app_instance.formato_config['fuente_texto']
-                tutor_run.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+            doc.add_paragraph()
+            self._agregar_lista_personas(doc, "Tutores", 
+                                       app_instance.proyecto_data['tutores'].get(), 
+                                       app_instance)
         
-        doc.add_paragraph()
-        doc.add_paragraph()
+        # Espaciado final
+        for _ in range(3):
+            doc.add_paragraph()
         
-        # Fecha - MEJORADO
+        # Fecha
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         year_label = p.add_run("Año: ")
         year_label.bold = True
-        year_label.font.name = app_instance.formato_config['fuente_texto']
-        year_label.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+        year_label.font.size = Pt(12)
         
         year_value = p.add_run(str(datetime.now().year))
-        year_value.font.name = app_instance.formato_config['fuente_texto']
-        year_value.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+        year_value.font.size = Pt(12)
         
         doc.add_page_break()
     
+    def _agregar_lista_personas(self, doc, titulo, personas_str, app_instance):
+        """Agrega una lista de personas (estudiantes o tutores) con formato"""
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        title_run = p.add_run(f"{titulo}:")
+        title_run.bold = True
+        title_run.font.size = Pt(13)
+        
+        personas = personas_str.split(',')
+        for persona in personas:
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(persona.strip())
+            run.font.size = Pt(12)
+    
     def crear_agradecimientos_profesional(self, doc, app_instance):
         """Crea página de agradecimientos con formato profesional"""
-        p = doc.add_paragraph()
-        p.style = doc.styles['Titulo Profesional']
-        run = p.add_run("AGRADECIMIENTOS")
-        run.bold = True
-        run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
-        
-        # Configurar como sección de nivel 1
-        p.paragraph_format.outline_level = 0
+        # Usar estilo Heading 1 para el título
+        p = doc.add_heading('AGRADECIMIENTOS', level=1)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         doc.add_paragraph()
         content_p = doc.add_paragraph("(Agregar agradecimientos personalizados aquí)")
@@ -290,124 +313,90 @@ class DocumentGenerator:
     
     def crear_indice_profesional(self, doc, app_instance):
         """Crea índice profesional con instrucciones"""
-        p = doc.add_paragraph()
-        p.style = doc.styles['Titulo Profesional']
-        run = p.add_run("ÍNDICE")
-        run.bold = True
-        run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
-        
-        # Configurar como sección de nivel 1
-        p.paragraph_format.outline_level = 0
+        # Usar estilo Heading 1
+        p = doc.add_heading('ÍNDICE', level=1)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         doc.add_paragraph()
         
         instrucciones = """INSTRUCCIONES PARA GENERAR ÍNDICE AUTOMÁTICO:
 
 1. En Word, ir a la pestaña "Referencias"
-2. Hacer clic en "Tabla de contenido"
-3. Seleccionar "Automática" o "Personalizada"
-4. El índice se generará automáticamente con todas las secciones
+2. Hacer clic en "Tabla de contenido"  
+3. Seleccionar el estilo deseado
+4. El índice se generará automáticamente
 
-NOTA: Todas las secciones están configuradas con Nivel de esquema 1 para 
-facilitar la generación automática del índice."""
+NOTA: Todos los títulos están configurados con niveles de esquema para facilitar la generación automática."""
         
-        content_p = doc.add_paragraph(instrucciones)
-        content_p.style = doc.styles['Normal']
+        for linea in instrucciones.split('\n'):
+            p = doc.add_paragraph(linea)
+            p.style = doc.styles['Normal']
         
         doc.add_paragraph()
         
-        # Sección para tabla de ilustraciones
-        p2 = doc.add_paragraph()
-        run2 = p2.add_run("TABLA DE ILUSTRACIONES")
-        run2.bold = True
-        run2.font.name = app_instance.formato_config['fuente_titulo']
-        run2.font.size = Pt(app_instance.formato_config['tamaño_titulo'] - 2)
-        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # Tabla de ilustraciones
+        p = doc.add_heading('TABLA DE ILUSTRACIONES', level=2)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         doc.add_paragraph("(Agregar manualmente si hay figuras, tablas o gráficos)")
         doc.add_page_break()
     
-    def crear_contenido_dinamico_profesional(self, doc, app_instance):
-        """Crea contenido basado en secciones activas con formato profesional"""
+    def crear_contenido_dinamico_mejorado(self, doc, app_instance):
+        """Crea contenido con niveles de esquema correctos"""
+        capitulo_num = 0
+        
         for seccion_id in app_instance.secciones_activas:
             if seccion_id in app_instance.secciones_disponibles:
                 seccion = app_instance.secciones_disponibles[seccion_id]
                 
                 if seccion['capitulo']:
                     # Es un título de capítulo
-                    p = doc.add_paragraph()
+                    capitulo_num += 1
+                    titulo = seccion['titulo']
+                    # Limpiar emojis
+                    titulo_limpio = re.sub(r'[^\w\s-]', '', titulo).strip()
+                    
+                    # Agregar como Heading 1
+                    p = doc.add_heading(titulo_limpio, level=1)
                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    run = p.add_run(seccion['titulo'].replace('📖 ', '').replace('📚 ', '').replace('🔬 ', '').replace('🛠️ ', '').replace('📊 ', '').replace('💬 ', ''))
-                    run.bold = True
-                    run.font.name = app_instance.formato_config['fuente_titulo']
-                    run.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
-                    p.paragraph_format.outline_level = 0
-                    p.paragraph_format.page_break_before = True
-                    doc.add_paragraph()
+                    
+                    # Salto de página si no es el primer capítulo
+                    if capitulo_num > 1:
+                        doc.add_page_break()
+                    else:
+                        doc.add_paragraph()
                 else:
-                    # Es contenido
+                    # Es contenido - agregar como Heading 2
                     if seccion_id in app_instance.content_texts:
                         contenido = app_instance.content_texts[seccion_id].get("1.0", "end").strip()
                         if contenido:
-                            titulo_limpio = seccion['titulo']
-                            # Remover emojis del título para el documento
-                            titulo_limpio = re.sub(r'[^\w\s-]', '', titulo_limpio).strip()
-                            self.crear_seccion_profesional(doc, titulo_limpio.upper(), contenido, app_instance)
+                            titulo = seccion['titulo']
+                            titulo_limpio = re.sub(r'[^\w\s-]', '', titulo).strip()
+                            self.crear_seccion_profesional(doc, titulo_limpio.upper(), 
+                                                         contenido, app_instance, nivel=2)
     
-    def crear_seccion_profesional(self, doc, titulo, contenido, app_instance):
-        """Crea una sección con formato profesional avanzado"""
-        # Título de la sección
-        p = doc.add_paragraph()
-        p.style = doc.styles['Titulo Profesional']
-        run = p.add_run(titulo)
-        run.bold = True
-        run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
-        
-        # Configurar como nivel de esquema para índice automático
-        p.paragraph_format.outline_level = 0
-        p.paragraph_format.keep_with_next = True
+    def crear_seccion_profesional(self, doc, titulo, contenido, app_instance, nivel=1):
+        """Crea una sección con nivel de esquema específico"""
+        # Título con nivel de esquema
+        p = doc.add_heading(titulo, level=nivel)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         # Contenido procesado
-        contenido_procesado = self.procesar_citas(contenido.strip(), app_instance)
+        contenido_procesado = self.procesar_citas_mejorado(contenido.strip(), app_instance)
+        
         if contenido_procesado:
-            p = doc.add_paragraph(contenido_procesado)
-            p.style = doc.styles['Normal']
-            
+            # Dividir en párrafos
+            parrafos = contenido_procesado.split('\n\n')
+            for parrafo in parrafos:
+                if parrafo.strip():
+                    p = doc.add_paragraph(parrafo.strip())
+                    p.style = doc.styles['Normal']
+        
         doc.add_paragraph()  # Espaciado
     
-    def crear_referencias_profesionales(self, doc, app_instance):
-        """Crea referencias con formato APA profesional"""
-        if not app_instance.referencias:
-            return
-        
-        # Título
-        p = doc.add_paragraph()
-        p.style = doc.styles['Titulo Profesional']
-        run = p.add_run("REFERENCIAS")
-        run.bold = True
-        run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
-        
-        # Configurar como sección de nivel 1
-        p.paragraph_format.outline_level = 0
-        
-        doc.add_paragraph()
-        
-        # Ordenar referencias alfabéticamente
-        referencias_ordenadas = sorted(app_instance.referencias, key=lambda x: x['autor'])
-        
-        for ref in referencias_ordenadas:
-            ref_text = f"{ref['autor']} ({ref['año']}). {ref['titulo']}. {ref['fuente']}"
-            p = doc.add_paragraph(ref_text)
-            # Formato APA: sangría francesa
-            p.paragraph_format.first_line_indent = Inches(-0.5)
-            p.paragraph_format.left_indent = Inches(0.5)
-            p.style = doc.styles['Normal']
-    
-    def procesar_citas(self, texto, app_instance):
-        """Procesa las citas en el texto"""
+    def procesar_citas_mejorado(self, texto, app_instance):
+        """Procesa las citas con formato mejorado"""
+        # Procesador de citas mejorado
         def reemplazar_cita(match):
             cita_completa = match.group(0)
             contenido = cita_completa[6:-1]  # Quita [CITA: y ]
@@ -417,23 +406,80 @@ facilitar la generación automática del índice."""
                 tipo, autor, año = partes[0], partes[1], partes[2]
                 pagina = partes[3] if len(partes) > 3 else None
                 
+                # Formatear según tipo
                 if tipo == 'textual':
-                    return f" ({autor}, {año}, p. {pagina})" if pagina else f" ({autor}, {año})"
+                    if pagina:
+                        return f" ({autor}, {año}, p. {pagina})"
+                    else:
+                        return f" ({autor}, {año})"
                 elif tipo == 'parafraseo':
                     return f" ({autor}, {año})"
                 elif tipo == 'larga':
-                    return f"\n\n({autor}, {año}, p. {pagina})\n\n" if pagina else f"\n\n({autor}, {año})\n\n"
+                    # Cita larga en bloque separado
+                    if pagina:
+                        return f"\n\n     ({autor}, {año}, p. {pagina})\n\n"
+                    else:
+                        return f"\n\n     ({autor}, {año})\n\n"
                 elif tipo == 'web':
                     return f" ({autor}, {año})"
                 elif tipo == 'multiple':
                     return f" ({autor}, {año})"
+                else:
+                    return f" ({autor}, {año})"
             
             return cita_completa
         
-        return re.sub(r'\[CITA:[^\]]+\]', reemplazar_cita, texto)
+        # Procesar todas las citas
+        texto_procesado = re.sub(r'\[CITA:[^\]]+\]', reemplazar_cita, texto)
+        
+        return texto_procesado
+    
+    def crear_referencias_profesionales(self, doc, app_instance):
+        """Crea referencias con formato APA profesional mejorado"""
+        if not app_instance.referencias:
+            return
+        
+        # Título como Heading 1
+        p = doc.add_heading('REFERENCIAS', level=1)
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        doc.add_paragraph()
+        
+        # Ordenar referencias alfabéticamente
+        referencias_ordenadas = sorted(app_instance.referencias, 
+                                     key=lambda x: x['autor'].split(',')[0].strip())
+        
+        for ref in referencias_ordenadas:
+            # Formatear según tipo
+            ref_text = self._formatear_referencia_apa(ref)
+            
+            p = doc.add_paragraph(ref_text)
+            # Formato APA: sangría francesa
+            p.paragraph_format.first_line_indent = Inches(-0.5)
+            p.paragraph_format.left_indent = Inches(0.5)
+            p.style = doc.styles['Normal']
+    
+    def _formatear_referencia_apa(self, ref):
+        """Formatea una referencia según el estilo APA"""
+        tipo = ref.get('tipo', 'Libro')
+        autor = ref.get('autor', '')
+        año = ref.get('año', '')
+        titulo = ref.get('titulo', '')
+        fuente = ref.get('fuente', '')
+        
+        if tipo == 'Libro':
+            return f"{autor} ({año}). _{titulo}_. {fuente}."
+        elif tipo == 'Artículo':
+            return f"{autor} ({año}). {titulo}. _{fuente}_."
+        elif tipo == 'Web':
+            return f"{autor} ({año}). {titulo}. Recuperado de {fuente}"
+        elif tipo == 'Tesis':
+            return f"{autor} ({año}). _{titulo}_ [Tesis]. {fuente}."
+        else:
+            return f"{autor} ({año}). {titulo}. {fuente}."
     
     def obtener_ruta_imagen(self, tipo, app_instance):
-        """Obtiene la ruta final de la imagen a usar (personalizada o base) - MEJORADA"""
+        """Obtiene la ruta de la imagen con prioridad correcta"""
         if tipo == "encabezado":
             # Prioridad: personalizada -> base
             return (getattr(app_instance, 'encabezado_personalizado', None) or 
@@ -446,38 +492,28 @@ facilitar la generación automática del índice."""
     
     def mostrar_mensaje_exito(self, filename, app_instance):
         """Muestra mensaje de éxito completo"""
-        # Mensaje de éxito
         app_instance.validation_text.delete("1.0", "end")
         app_instance.validation_text.insert("1.0", 
             f"🎉 ¡DOCUMENTO PROFESIONAL GENERADO!\n\n"
             f"📄 Archivo: {os.path.basename(filename)}\n"
             f"📍 Ubicación: {filename}\n\n"
-            f"✅ CARACTERÍSTICAS APLICADAS:\n"
-            f"   • Formato profesional personalizado\n"
-            f"   • Niveles de esquema para índice automático\n"
-            f"   • Saltos de página entre secciones\n"
-            f"   • Control de líneas viudas y huérfanas\n"
-            f"   • Conservar títulos con contenido\n"
-            f"   • Fuente: {app_instance.formato_config['fuente_texto']} {app_instance.formato_config['tamaño_texto']}pt\n"
-            f"   • Títulos: {app_instance.formato_config['fuente_titulo']} {app_instance.formato_config['tamaño_titulo']}pt\n"
-            f"   • Imágenes: {'Personalizadas' if getattr(app_instance, 'encabezado_personalizado', None) or getattr(app_instance, 'insignia_personalizada', None) else 'Base'}\n\n"
-            f"✅ Estructura profesional ({len(app_instance.secciones_activas)} secciones)\n"
-            f"✅ {len(app_instance.referencias)} referencias APA\n"
-            f"✅ Citas procesadas automáticamente\n\n"
+            f"✅ MEJORAS APLICADAS:\n"
+            f"   • Encabezados con imágenes\n"
+            f"   • Niveles de esquema correctos (Heading 1-6)\n"
+            f"   • Formato de citas mejorado\n"
+            f"   • Referencias APA optimizadas\n"
+            f"   • Saltos de página inteligentes\n"
+            f"   • Estructura de capítulos\n\n"
             f"📋 PARA COMPLETAR EN WORD:\n"
-            f"   • Generar índice: Referencias > Tabla de contenido\n"
-            f"   • Agregar numeración de páginas si deseas\n"
-            f"   • Insertar tablas o figuras según necesidad\n\n"
-            f"🚀 ¡Tu proyecto profesional está listo!"
+            f"   • Referencias > Tabla de contenido > Automática\n"
+            f"   • El índice detectará todos los niveles\n\n"
+            f"🚀 ¡Tu proyecto está listo con calidad profesional!"
         )
         
-        messagebox.showinfo("🎉 ¡Documento Profesional Generado!", 
-            f"Documento creado exitosamente:\n{filename}\n\n"
-            f"Características aplicadas:\n"
-            f"• Formato profesional con niveles de esquema\n"
-            f"• Saltos de página automáticos\n"
-            f"• Control de líneas profesional\n"
-            f"• Imágenes integradas\n"
-            f"• Referencias APA automáticas\n\n"
-            f"Para generar el índice automático:\n"
-            f"Referencias > Tabla de contenido > Automática")
+        messagebox.showinfo("🎉 ¡Éxito Total!", 
+            f"Documento generado con todas las mejoras:\n{filename}\n\n"
+            f"Características implementadas:\n"
+            f"• Encabezados con imágenes\n"
+            f"• Niveles de esquema funcionales\n"
+            f"• Sistema de citas optimizado\n"
+            f"• Formato profesional completo")
