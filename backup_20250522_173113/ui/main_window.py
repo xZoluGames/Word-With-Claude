@@ -42,16 +42,11 @@ class ProyectoAcademicoGenerator:
         self.documento_base = None
         self.usar_formato_base = False
         
-                # Variables para imágenes
+        # Variables para imágenes
         self.encabezado_personalizado = None
         self.insignia_personalizada = None
         self.ruta_encabezado = None
         self.ruta_insignia = None
-        
-        # Configuración de marca de agua
-        self.watermark_opacity = 0.3
-        self.watermark_stretch = True
-        self.watermark_mode = 'watermark'  # 'watermark' o 'normal' 
         
         # Buscar imágenes base
         self.buscar_imagenes_base()
@@ -1057,71 +1052,6 @@ class ProyectoAcademicoGenerator:
         )
         close_btn.pack(side="right")
         
-                # Sección de configuración de marca de agua
-        watermark_frame = ctk.CTkFrame(main_frame, fg_color="purple", corner_radius=10)
-        watermark_frame.pack(fill="x", pady=(0, 20))
-        
-        watermark_title = ctk.CTkLabel(
-            watermark_frame, text="⚙️ Configuración de Marca de Agua",
-            font=ctk.CTkFont(size=14, weight="bold"), text_color="white"
-        )
-        watermark_title.pack(pady=(15, 10))
-        
-        # Control de opacidad
-        opacity_frame = ctk.CTkFrame(watermark_frame, fg_color="transparent")
-        opacity_frame.pack(fill="x", padx=20, pady=(0, 10))
-        
-        ctk.CTkLabel(
-            opacity_frame, text="Transparencia:",
-            font=ctk.CTkFont(size=12), text_color="white"
-        ).pack(side="left", padx=(0, 10))
-        
-        self.opacity_slider = ctk.CTkSlider(
-            opacity_frame, from_=0.1, to=1.0,
-            command=self.actualizar_opacidad_preview
-        )
-        self.opacity_slider.set(self.watermark_opacity)
-        self.opacity_slider.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        
-        self.opacity_label = ctk.CTkLabel(
-            opacity_frame, text=f"{int(self.watermark_opacity * 100)}%",
-            font=ctk.CTkFont(size=12), text_color="white"
-        )
-        self.opacity_label.pack(side="left")
-        
-        # Modo de encabezado
-        mode_frame = ctk.CTkFrame(watermark_frame, fg_color="transparent")
-        mode_frame.pack(fill="x", padx=20, pady=(0, 10))
-        
-        ctk.CTkLabel(
-            mode_frame, text="Modo:",
-            font=ctk.CTkFont(size=12), text_color="white"
-        ).pack(side="left", padx=(0, 10))
-        
-        self.mode_var = ctk.StringVar(value=self.watermark_mode)
-        
-        watermark_radio = ctk.CTkRadioButton(
-            mode_frame, text="Marca de Agua",
-            variable=self.mode_var, value="watermark",
-            text_color="white"
-        )
-        watermark_radio.pack(side="left", padx=(0, 20))
-        
-        normal_radio = ctk.CTkRadioButton(
-            mode_frame, text="Normal",
-            variable=self.mode_var, value="normal",
-            text_color="white"
-        )
-        normal_radio.pack(side="left")
-        
-        # Estirar al ancho
-        self.stretch_var = ctk.CTkCheckBox(
-            watermark_frame, text="Estirar al ancho de página",
-            font=ctk.CTkFont(size=12), text_color="white"
-        )
-        self.stretch_var.select() if self.watermark_stretch else self.stretch_var.deselect()
-        self.stretch_var.pack(pady=(0, 15))
-        
         # Información adicional
         info_frame = ctk.CTkFrame(main_frame, fg_color="green", corner_radius=10)
         info_frame.pack(fill="x")
@@ -1774,18 +1704,6 @@ para tu institución y tipo de proyecto.
     
     def configuracion_avanzada(self):
         messagebox.showinfo("🚧 En desarrollo", "Configuración avanzada en desarrollo")
-    
-    
-    def actualizar_opacidad_preview(self, value):
-        """Actualiza el preview de opacidad"""
-        self.watermark_opacity = float(value)
-        self.opacity_label.configure(text=f"{int(self.watermark_opacity * 100)}%")
-        
-    def aplicar_configuracion_watermark(self):
-        """Aplica la configuración de marca de agua"""
-        self.watermark_mode = self.mode_var.get()
-        self.watermark_stretch = self.stretch_var.get()
-        messagebox.showinfo("✅ Aplicado", "Configuración de marca de agua actualizada")
     
     def run(self):
         """Ejecuta la aplicación"""

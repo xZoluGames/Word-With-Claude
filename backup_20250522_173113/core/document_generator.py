@@ -9,7 +9,6 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.section import WD_SECTION, WD_ORIENTATION
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from modules.watermark import WatermarkManager
 import threading
 import os
 from datetime import datetime
@@ -112,51 +111,58 @@ class DocumentGenerator:
     
     def configurar_encabezado_marca_agua(self, section, app_instance):
         """Configura el encabezado como marca de agua detrás del texto"""
-        try:
-            # Obtener rutas de imágenes
-            ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
-            ruta_insignia = self.obtener_ruta_imagen("insignia", app_instance)
+        header = section.header
+        
+        # Limpiar contenido existente
+        for paragraph in header.paragraphs:
+            p = paragraph._element
+            p.getparent().remove(p)
+            p._p = p._element = None
+        
+        # Obtener ruta de imagen de encabezado
+        ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
+        
+        if ruta_encabezado and os.path.exists(ruta_encabezado):
+            # Crear párrafo para la imagen
+            p = header.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
-            # Usar el nuevo sistema de marcas de agua
-            if ruta_encabezado and os.path.exists(ruta_encabezado):
-                # Obtener configuración de marca de agua
-                watermark_config = {
-                    'opacity': getattr(app_instance, 'watermark_opacity', 0.3),
-                    'stretch': getattr(app_instance, 'watermark_stretch', True),
-                    'position': 'header'
-                }
+            # Agregar imagen con configuración especial
+            run = p.add_run()
+            try:
+                picture = run.add_picture(ruta_encabezado, width=Inches(6.5))
                 
-                # Aplicar marca de agua
-                self.watermark_manager.add_watermark_to_section(
-                    section, 
-                    ruta_encabezado,
-                    watermark_config['opacity'],
-                    watermark_config['stretch']
-                )
+                # Configurar la imagen para que esté detrás del texto
+                # Acceder al elemento XML de la imagen
+                drawing = picture._element
                 
-                # Si hay insignia, agregarla como elemento flotante
-                if ruta_insignia and os.path.exists(ruta_insignia):
-                    header = section.header
-                    if header.paragraphs:
-                        p = header.paragraphs[0]
-                        run = p.add_run()
-                        run.add_picture(ruta_insignia, width=Inches(1.0))
-            
-            else:
-                # Fallback al método anterior si no hay imagen
-                header = section.header
-                p = header.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = p.add_run(app_instance.proyecto_data.get('institucion', {}).get() or "INSTITUCIÓN EDUCATIVA")
-                run.bold = True
-                run.font.size = Pt(14)
-                run.font.color.rgb = RGBColor(200, 200, 200)
+                # Buscar el elemento anchor
+                for child in drawing:
+                    if child.tag.endswith('anchor'):
+                        # Configurar behindDoc="1" para poner la imagen detrás del texto
+                        child.set('behindDoc', '1')
+                        
+                        # Ajustar posición y transparencia
+                        for prop in child:
+                            if prop.tag.endswith('positionH'):
+                                prop.set('relativeFrom', 'page')
+                            if prop.tag.endswith('positionV'):
+                                prop.set('relativeFrom', 'page')
                 
-        except Exception as e:
-            print(f"Error configurando encabezado como marca de agua: {e}")
-            # Usar encabezado simple como fallback
-            self._configurar_encabezado_simple(section, app_instance)
-
+                # Hacer la imagen más transparente (efecto marca de agua)
+                # Esto se puede lograr con efectos adicionales si es necesario
+                
+            except Exception as e:
+                print(f"Error agregando imagen de encabezado: {e}")
+        else:
+            # Si no hay imagen, agregar texto simple
+            p = header.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = p.add_run(app_instance.proyecto_data.get('institucion', {}).get() or "INSTITUCIÓN EDUCATIVA")
+            run.bold = True
+            run.font.size = Pt(14)
+            run.font.color.rgb = RGBColor(128, 128, 128)  # Gris para efecto marca de agua
+    
     def configurar_estilos_profesionales(self, doc, app_instance):
         """Configura estilos profesionales del documento"""
         # Estilo normal
