@@ -13,22 +13,27 @@ class GeneracionTab:
     
     def setup_ui(self):
         """Configura la interfaz de generación"""
+        # Contenedor principal para toda la pestaña
+        main_container = ctk.CTkFrame(self.parent, fg_color="transparent")
+        main_container.pack(fill="both", expand=True)
+        
         # Panel superior - Opciones
-        self.create_options_panel()
+        self.create_options_panel(main_container)
         
         # Panel inferior - Validación
-        self.create_validation_panel()
+        self.create_validation_panel(main_container)
         
         # Inicializar con mensaje de bienvenida
         self.app.mostrar_bienvenida_validacion()
     
-    def create_options_panel(self):
+    def create_options_panel(self, parent):
         """Crea el panel de opciones de generación"""
-        paned = ctk.CTkFrame(self.parent, fg_color="transparent")
-        paned.pack(fill="both", expand=True, padx=20, pady=20)
+        # Frame contenedor para opciones
+        options_container = ctk.CTkFrame(parent, fg_color="transparent")
+        options_container.pack(fill="x", padx=20, pady=(20, 10))
         
-        top_frame = ctk.CTkFrame(paned, corner_radius=15, height=200)
-        top_frame.pack(fill="x", pady=(0, 10))
+        top_frame = ctk.CTkFrame(options_container, corner_radius=15, height=200)
+        top_frame.pack(fill="x")
         top_frame.pack_propagate(False)
         
         options_title = ctk.CTkLabel(
@@ -77,10 +82,14 @@ class GeneracionTab:
         self.app.numeracion_paginas.select()
         self.app.numeracion_paginas.pack(anchor="w", pady=5)
     
-    def create_validation_panel(self):
+    def create_validation_panel(self, parent):
         """Crea el panel de validación"""
-        bottom_frame = ctk.CTkFrame(self.parent.master, corner_radius=15)
-        bottom_frame.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        # Frame contenedor para el panel de validación
+        validation_container = ctk.CTkFrame(parent, fg_color="transparent")
+        validation_container.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        bottom_frame = ctk.CTkFrame(validation_container, corner_radius=15)
+        bottom_frame.pack(fill="both", expand=True)
         
         # Header con tabs
         header_frame = ctk.CTkFrame(bottom_frame, height=50, fg_color="gray25")

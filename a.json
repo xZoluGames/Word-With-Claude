@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "fecha_creacion": "2025-05-24T16:08:44.614599",
+  "fecha_creacion": "2025-05-24T19:53:21.866989",
   "informacion_general": {
     "institucion": "COLEGIO PRIVADO DIVINA ESPERANZA",
     "titulo": "Hdsfdsf",
@@ -15,20 +15,20 @@
     "responsable": "Jose,Alex,Maria,Ronaldo, Arturo, Diego, Analia, Marcos, Maria"
   },
   "contenido_secciones": {
-    "resumen": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "introduccion": "Hola, texto relleno, probando jaja hola hola que tal texto prueba este word va a ser genial luego, espero te guste, ya se va llenando mi parrafo :C\nSegundo parrafo.\n\n\n\n",
-    "planteamiento": "Hola, texto relleno, probando jaja hola hola que tal texto prueba este word va a ser genial luego, espero te guste, ya se va llenando mi parrafo :C\nSegundo parrafo.\n\n\n\n\n",
-    "preguntas": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "delimitaciones": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
-    "justificacion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
-    "objetivos": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
-    "marco_teorico": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "metodologia": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "desarrollo": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "resultados": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "analisis_datos": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n",
-    "discusion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
-    "conclusiones": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n"
+    "resumen": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n\n",
+    "introduccion": "Hola, texto relleno, probando jaja hola hola que tal texto prueba este word va a ser genial luego, espero te guste, ya se va llenando mi parrafo :C\nSegundo parrafo.\n\n\n\n\n",
+    "planteamiento": "Hola, texto relleno, probando jaja hola hola que tal texto prueba este word va a ser genial luego, espero te guste, ya se va llenando mi parrafo :C\nSegundo parrafo.\n\n\n\n\n\n",
+    "preguntas": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n\n",
+    "delimitaciones": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
+    "justificacion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
+    "objetivos": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n",
+    "marco_teorico": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n[CITA:parafraseo:Silva Alex:2025] \n",
+    "metodologia": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n\n",
+    "desarrollo": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n\n",
+    "resultados": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n\n",
+    "analisis_datos": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "discusion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n\n",
+    "conclusiones": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n\n"
   },
   "referencias": [],
   "secciones_activas": [
@@ -190,8 +190,8 @@
     "insignia_personalizada": null
   },
   "estadisticas": {
-    "total_words": 276,
-    "total_chars": 1564,
+    "total_words": 278,
+    "total_chars": 1598,
     "sections_completed": 14,
     "references_added": 0
   }

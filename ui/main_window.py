@@ -224,79 +224,80 @@ class ProyectoAcademicoGenerator:
         self._create_header_buttons(header_frame)
     
     def _create_header_buttons(self, parent):
-        """Crea los botones del header"""
-        button_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        button_frame.pack(fill="x", padx=20, pady=(5, 10))
-        
-        # Primera fila
-        btn_row1 = ctk.CTkFrame(button_frame, fg_color="transparent")
-        btn_row1.pack(fill="x", pady=(0, 5))
-        
-        # Botones de la primera fila
-        buttons_row1 = [
-            ("📖 Guía", self.mostrar_instrucciones, "blue", 80),
-            ("📋 Plantilla", self.cargar_documento_base, "purple", 90),
-            ("💾 Guardar", self.guardar_proyecto, "darkgreen", 80),
-            ("📂 Cargar", self.cargar_proyecto, "darkblue", 80)
-        ]
-        
-        for text, command, color, width in buttons_row1:
-            btn = ctk.CTkButton(
-                btn_row1, text=text, command=command,
-                width=width, height=30, 
-                font=self.font_manager.get_font("small", "bold"),
-                fg_color=color if color != "blue" else None,
-                hover_color=f"dark{color}" if color != "blue" else None
+            """Crea los botones del header"""
+            button_frame = ctk.CTkFrame(parent, fg_color="transparent")
+            button_frame.pack(fill="x", padx=20, pady=(5, 10))
+            
+            # Primera fila
+            btn_row1 = ctk.CTkFrame(button_frame, fg_color="transparent")
+            btn_row1.pack(fill="x", pady=(0, 5))
+            
+            # Botones de la primera fila - corregidos para evitar errores de color
+            buttons_row1 = [
+                ("📖 Guía", self.mostrar_instrucciones, None, None, 80),  # Color por defecto
+                ("📋 Plantilla", self.cargar_documento_base, "#9370DB", "#7B68EE", 90),  # Purple colors
+                ("💾 Guardar", self.guardar_proyecto, "#228B22", "#006400", 80),  # Forest green
+                ("📂 Cargar", self.cargar_proyecto, "#4682B4", "#191970", 80)  # Steel blue
+            ]
+            
+            for text, command, fg_color, hover_color, width in buttons_row1:
+                btn = ctk.CTkButton(
+                    btn_row1, text=text, command=command,
+                    width=width, height=30, 
+                    font=self.font_manager.get_font("small", "bold"),
+                    fg_color=fg_color,
+                    hover_color=hover_color
+                )
+                btn.pack(side="left", padx=(0, 5))
+            
+            # Estadísticas
+            self.stats_label = ctk.CTkLabel(
+                btn_row1, text="📊 Palabras: 0 | Secciones: 0/13 | Referencias: 0",
+                font=self.font_manager.get_font("small"), text_color="gray70"
             )
-            btn.pack(side="left", padx=(0, 5))
-        
-        # Estadísticas
-        self.stats_label = ctk.CTkLabel(
-            btn_row1, text="📊 Palabras: 0 | Secciones: 0/13 | Referencias: 0",
-            font=self.font_manager.get_font("small"), text_color="gray70"
-        )
-        self.stats_label.pack(side="right", padx=(5, 0))
-        
-        # Segunda fila
-        btn_row2 = ctk.CTkFrame(button_frame, fg_color="transparent")
-        btn_row2.pack(fill="x")
-        
-        # Botones de la segunda fila
-        buttons_row2 = [
-            ("🖼️ Imágenes", self.gestionar_imagenes, "darkblue", 90),
-            ("📤 Exportar Config", self.exportar_configuracion, "darkorange", 110),
-            ("🔍 Validar", self.validar_proyecto, "orange", 80),
-            ("🗂️ Plantillas", self.gestionar_plantillas, "indigo", 90)
-        ]
-        
-        for text, command, color, width in buttons_row2:
-            btn = ctk.CTkButton(
-                btn_row2, text=text, command=command,
-                width=width, height=30,
+            self.stats_label.pack(side="right", padx=(5, 0))
+            
+            # Segunda fila
+            btn_row2 = ctk.CTkFrame(button_frame, fg_color="transparent")
+            btn_row2.pack(fill="x")
+            
+            # Botones de la segunda fila - corregidos
+            buttons_row2 = [
+                ("🖼️ Imágenes", self.gestionar_imagenes, "#4682B4", "#191970", 90),  # Steel blue
+                ("📤 Exportar Config", self.exportar_configuracion, "#FF8C00", "#FF6347", 110),  # Dark orange
+                ("🔍 Validar", self.validar_proyecto, "#FFA500", "#FF8C00", 80),  # Orange
+                ("🗂️ Plantillas", self.gestionar_plantillas, "#4B0082", "#6A0DAD", 90)  # Indigo valid colors
+            ]
+            
+            for text, command, fg_color, hover_color, width in buttons_row2:
+                btn = ctk.CTkButton(
+                    btn_row2, text=text, command=command,
+                    width=width, height=30,
+                    font=self.font_manager.get_font("small", "bold"),
+                    fg_color=fg_color, 
+                    hover_color=hover_color
+                )
+                btn.pack(side="left", padx=(0, 5))
+            
+            # Botón generar
+            self.generate_btn = ctk.CTkButton(
+                btn_row2, text="📄 Generar Documento", 
+                command=self.generar_documento_async,
+                width=140, height=30, 
                 font=self.font_manager.get_font("small", "bold"),
-                fg_color=color, hover_color=f"dark{color}"
+                fg_color="#228B22", hover_color="#006400"  # Forest green
             )
-            btn.pack(side="left", padx=(0, 5))
-        
-        # Botón generar
-        self.generate_btn = ctk.CTkButton(
-            btn_row2, text="📄 Generar Documento", 
-            command=self.generar_documento_async,
-            width=140, height=30, 
-            font=self.font_manager.get_font("small", "bold"),
-            fg_color="green", hover_color="darkgreen"
-        )
-        self.generate_btn.pack(side="right", padx=(5, 0))
-        
-        # Guardar referencias a botones para tooltips
-        self.help_btn = buttons_row1[0]
-        self.template_btn = buttons_row1[1]
-        self.save_btn = buttons_row1[2]
-        self.load_btn = buttons_row1[3]
-        self.images_btn = buttons_row2[0]
-        self.export_btn = buttons_row2[1]
-        self.validate_btn = buttons_row2[2]
-        self.plantillas_btn = buttons_row2[3]
+            self.generate_btn.pack(side="right", padx=(5, 0))
+            
+            # Guardar referencias a botones para tooltips (índices actualizados)
+            self.help_btn = btn_row1.winfo_children()[0]
+            self.template_btn = btn_row1.winfo_children()[1]
+            self.save_btn = btn_row1.winfo_children()[2]
+            self.load_btn = btn_row1.winfo_children()[3]
+            self.images_btn = btn_row2.winfo_children()[0]
+            self.export_btn = btn_row2.winfo_children()[1]
+            self.validate_btn = btn_row2.winfo_children()[2]
+            self.plantillas_btn = btn_row2.winfo_children()[3]
     
     def _create_tabs(self):
         """Crea las pestañas principales"""
@@ -654,24 +655,34 @@ class ProyectoAcademicoGenerator:
             item_frame = ctk.CTkFrame(self.secciones_listbox, fg_color="gray20", corner_radius=5)
             item_frame.pack(fill="x", padx=5, pady=2)
             
-            # Checkbox para activar/desactivar
-            var = ctk.BooleanVar(value=True)
-            checkbox = ctk.CTkCheckBox(
-                item_frame, text=seccion['titulo'],
-                variable=var,
-                font=ctk.CTkFont(size=11),
-                command=lambda: self._toggle_seccion(seccion_id, var.get())
-            )
-            checkbox.pack(side="left", padx=10, pady=5)
+            # Texto de la sección
+            label_text = seccion['titulo']
+            if seccion.get('capitulo', False):
+                label_text = f"📁 {label_text}"
+            elif seccion.get('requerida', False):
+                label_text = f"⚠️ {label_text}"
             
-            # Indicador si es requerida
-            if seccion.get('requerida', False):
-                req_label = ctk.CTkLabel(
-                    item_frame, text="⚠️",
-                    font=ctk.CTkFont(size=10)
-                )
-                req_label.pack(side="right", padx=10)
-
+            label = ctk.CTkLabel(
+                item_frame, text=label_text,
+                font=ctk.CTkFont(size=11),
+                anchor="w"
+            )
+            label.pack(side="left", padx=10, pady=5, fill="x", expand=True)
+            
+            # Guardar referencia para selección
+            item_frame.seccion_id = seccion_id
+            item_frame.bind("<Button-1>", lambda e: self._seleccionar_seccion(seccion_id))
+    def _seleccionar_seccion(self, seccion_id):
+        """Maneja la selección de una sección en la lista"""
+        # Buscar la pestaña correspondiente
+        if seccion_id in self.secciones_disponibles:
+            seccion = self.secciones_disponibles[seccion_id]
+            if not seccion.get('capitulo', False) and hasattr(self, 'content_tabview'):
+                # Buscar y seleccionar la pestaña
+                for tab_name in self.content_tabview._tab_dict:
+                    if tab_name == seccion['titulo']:
+                        self.content_tabview.set(tab_name)
+                        break
     def _toggle_seccion(self, seccion_id, activa):
         """Activa o desactiva una sección"""
         if activa and seccion_id not in self.secciones_activas:
@@ -703,9 +714,17 @@ class ProyectoAcademicoGenerator:
     def crear_pestanas_contenido(self):
         """Crea las pestañas de contenido dinámicamente"""
         if hasattr(self, 'content_tabview'):
+            # Guardar contenido actual antes de recrear
+            contenido_temporal = {}
+            for seccion_id, text_widget in self.content_texts.items():
+                contenido_temporal[seccion_id] = text_widget.get("1.0", "end-1c")
+            
             # Limpiar pestañas existentes
             for tab in list(self.content_tabview._tab_dict.keys()):
                 self.content_tabview.delete(tab)
+            
+            # Limpiar diccionario de widgets
+            self.content_texts.clear()
             
             # Crear nuevas pestañas según secciones activas
             for seccion_id in self.secciones_activas:
@@ -716,8 +735,12 @@ class ProyectoAcademicoGenerator:
                     if not seccion.get('capitulo', False):
                         tab = self.content_tabview.add(seccion['titulo'])
                         self._crear_contenido_seccion(tab, seccion_id, seccion)
+                        
+                        # Restaurar contenido si existía
+                        if seccion_id in contenido_temporal and seccion_id in self.content_texts:
+                            self.content_texts[seccion_id].insert("1.0", contenido_temporal[seccion_id])
             
-            # Actualizar breadcrumb
+            # Actualizar breadcrumb si existe
             if hasattr(self, 'breadcrumb_label'):
                 current_tab = self.content_tabview.get() if self.content_tabview._tab_dict else ""
                 self.breadcrumb_label.configure(text=f"📍 Navegación: {current_tab}")
@@ -751,19 +774,15 @@ class ProyectoAcademicoGenerator:
         # Guardar referencia al widget de texto
         self.content_texts[seccion_id] = text_widget
         
-        # Si ya hay contenido guardado, restaurarlo
-        if hasattr(self, 'contenido_guardado') and seccion_id in self.contenido_guardado:
-            text_widget.insert("1.0", self.contenido_guardado[seccion_id])
-        
         # Barra de herramientas
         self._crear_toolbar_seccion(section_frame, seccion_id, text_widget)
-
+    
     def _crear_toolbar_seccion(self, parent, seccion_id, text_widget):
         """Crea la barra de herramientas para una sección"""
         toolbar = ctk.CTkFrame(parent, height=40, fg_color="gray20")
         toolbar.pack(fill="x", padx=10, pady=(0, 10))
         
-        # Botón insertar cita
+        # Botón insertar cita (solo para secciones específicas)
         if seccion_id in ['marco_teorico', 'introduccion', 'desarrollo', 'discusion']:
             cita_btn = ctk.CTkButton(
                 toolbar, text="📚 Insertar Cita",
@@ -782,10 +801,11 @@ class ProyectoAcademicoGenerator:
         # Actualizar contador al escribir
         def update_count(event=None):
             content = text_widget.get("1.0", "end-1c")
-            words = len(content.split())
+            words = len(content.split()) if content.strip() else 0
             word_count.configure(text=f"Palabras: {words}")
         
         text_widget.bind("<KeyRelease>", update_count)
+        update_count()  # Actualizar inicialmente
 
     def insertar_cita_dialog(self, text_widget, seccion_tipo):
         """Abre el diálogo para insertar citas"""
@@ -1735,8 +1755,7 @@ class ProyectoAcademicoGenerator:
         if hasattr(self, 'preview_window'):
             self.preview_window.withdraw()
 
-    # ========== MÉTODOS ADICIONALES QUE PODRÍAN FALTAR ==========
-
+    @property
     def documento_base(self):
         """Getter para documento_base"""
         if not hasattr(self, '_documento_base'):
@@ -1748,13 +1767,14 @@ class ProyectoAcademicoGenerator:
         """Setter para documento_base"""
         self._documento_base = value
 
+    @property
     def contenido_guardado(self):
         """Getter para contenido_guardado"""
         if not hasattr(self, '_contenido_guardado'):
             self._contenido_guardado = {}
         return self._contenido_guardado
 
-    @contenido_guardado.setter  
+    @contenido_guardado.setter
     def contenido_guardado(self, value):
         """Setter para contenido_guardado"""
         self._contenido_guardado = value
@@ -1775,23 +1795,61 @@ class ProyectoAcademicoGenerator:
             pass
     
     def crear_pestanas_contenido(self):
-        """Crea las pestañas de contenido basadas en secciones activas"""
-        # Implementación en contenido_dinamico_tab
-        if hasattr(self, 'contenido_dinamico_tab'):
-            # Delegar a la pestaña
-            pass
+        """Crea las pestañas de contenido dinámicamente"""
+        if hasattr(self, 'content_tabview'):
+            # Guardar contenido actual antes de recrear
+            contenido_temporal = {}
+            for seccion_id, text_widget in self.content_texts.items():
+                contenido_temporal[seccion_id] = text_widget.get("1.0", "end-1c")
+            
+            # Limpiar pestañas existentes
+            for tab in list(self.content_tabview._tab_dict.keys()):
+                self.content_tabview.delete(tab)
+            
+            # Limpiar diccionario de widgets
+            self.content_texts.clear()
+            
+            # Crear nuevas pestañas según secciones activas
+            for seccion_id in self.secciones_activas:
+                if seccion_id in self.secciones_disponibles:
+                    seccion = self.secciones_disponibles[seccion_id]
+                    
+                    # No crear pestaña para capítulos (solo son títulos)
+                    if not seccion.get('capitulo', False):
+                        tab = self.content_tabview.add(seccion['titulo'])
+                        self._crear_contenido_seccion(tab, seccion_id, seccion)
+                        
+                        # Restaurar contenido si existía
+                        if seccion_id in contenido_temporal and seccion_id in self.content_texts:
+                            self.content_texts[seccion_id].insert("1.0", contenido_temporal[seccion_id])
+            
+            # Actualizar breadcrumb si existe
+            if hasattr(self, 'breadcrumb_label'):
+                current_tab = self.content_tabview.get() if self.content_tabview._tab_dict else ""
+                self.breadcrumb_label.configure(text=f"📍 Navegación: {current_tab}")
     
     # Métodos de gestión de secciones
     def agregar_seccion(self):
         """Agrega una nueva sección personalizada"""
+        from .dialogs import SeccionDialog
+        
         dialog = SeccionDialog(self.root, self.secciones_disponibles)
+        self.root.wait_window(dialog.dialog)
+        
         if dialog.result:
             seccion_id, seccion_data = dialog.result
-            self.secciones_disponibles[seccion_id] = seccion_data
-            self.secciones_activas.append(seccion_id)
-            self.actualizar_lista_secciones()
-            self.crear_pestanas_contenido()
-            messagebox.showinfo("✅ Agregada", f"Sección '{seccion_data['titulo']}' agregada correctamente")
+            try:
+                # Usar el section_manager
+                self.section_manager.agregar_seccion(seccion_id, seccion_data)
+                self.secciones_disponibles = self.section_manager.secciones_disponibles
+                self.secciones_activas = self.section_manager.secciones_activas
+                
+                # Actualizar UI
+                self.actualizar_lista_secciones()
+                self.crear_pestanas_contenido()
+                messagebox.showinfo("✅ Agregada", f"Sección '{seccion_data['titulo']}' agregada correctamente")
+            except Exception as e:
+                messagebox.showerror("❌ Error", str(e))
     
     def quitar_seccion(self):
         """Quita secciones seleccionadas"""
