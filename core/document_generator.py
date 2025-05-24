@@ -3,7 +3,7 @@ Generador de documentos Word - Versión Corregida con Encabezados como Marca de 
 """
 
 from docx import Document
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Inches, Pt, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_BREAK
 from docx.enum.style import WD_STYLE_TYPE
 from docx.enum.section import WD_SECTION, WD_ORIENTATION
@@ -112,62 +112,107 @@ class DocumentGenerator:
         self.configurar_estilos_profesionales(doc, app_instance)
     
     def configurar_encabezado_marca_agua(self, section, app_instance):
-        """Configura el encabezado como marca de agua detrás del texto - Versión Compatible"""
+        """Configura el encabezado como marca de agua detrás del texto - Versión Corregida"""
         try:
+            # IMPORTANTE: Configurar primera página diferente
+            section.different_first_page_header_footer = True
+            
+            # Configurar márgenes de sección
+            section.top_margin = Cm(2.5)
+            section.bottom_margin = Cm(2.5)
+            section.left_margin = Cm(3)
+            section.right_margin = Cm(3)
+            section.header_distance = Cm(1.25)
+            section.footer_distance = Cm(1.25)
+            
             # Obtener rutas de imágenes
             ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
-            ruta_insignia = self.obtener_ruta_imagen("insignia", app_instance)
             
+            # SOLO configurar encabezado para páginas 2+
+            # NO agregar nada al encabezado de primera página
             if ruta_encabezado and os.path.exists(ruta_encabezado):
                 # Obtener configuración
                 opacity = getattr(app_instance, 'watermark_opacity', 0.3)
                 stretch = getattr(app_instance, 'watermark_stretch', True)
                 mode = getattr(app_instance, 'watermark_mode', 'watermark')
                 
-                if mode == 'watermark' and hasattr(self, 'watermark_manager'):
-                    # Intentar aplicar como marca de agua
-                    success = self.watermark_manager.add_watermark_to_section(
-                        section, ruta_encabezado, opacity, stretch
-                    )
-                    
-                    if not success:
-                        # Si falla, usar método simple
-                        self.watermark_manager.add_simple_header_image(
-                            section, ruta_encabezado, 
-                            width_inches=7.5 if stretch else 6.5
-                        )
-                else:
-                    # Modo normal - agregar imagen simple
-                    header = section.header
-                    if not header.paragraphs:
-                        p = header.add_paragraph()
-                    else:
-                        p = header.paragraphs[0]
-                    
-                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    run = p.add_run()
-                    run.add_picture(ruta_encabezado, width=Inches(7.5 if stretch else 6.5))
+                # Trabajar SOLO con el header principal (NO primera página)
+                header = section.header  # Este es el header para páginas 2+
                 
-                # Agregar insignia si existe
-                if ruta_insignia and os.path.exists(ruta_insignia):
+                # Limpiar header existente
+                for para in header.paragraphs:
+                    p = para._element
+                    p.getparent().remove(p)
+                
+                # Agregar párrafo para la imagen
+                header_para = header.add_paragraph()
+                header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                
+                # Agregar imagen del encabezado
+                run = header_para.add_run()
+                
+                if mode == 'watermark' and hasattr(self, 'watermark_manager'):
+                    # Intentar aplicar como marca de agua con configuración correcta
                     try:
-                        header = section.header
-                        # Crear nuevo párrafo para la insignia
-                        p_logo = header.add_paragraph()
-                        p_logo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                        run_logo = p_logo.add_run()
-                        run_logo.add_picture(ruta_insignia, width=Inches(1.0))
+                        # Usar dimensiones específicas del watermark_manager
+                        header_pic = run.add_picture(ruta_encabezado, width=self.watermark_manager.header_config['width'])
+                        
+                        # Configurar como marca de agua detrás del texto
+                        self.watermark_manager.configurar_imagen_detras_texto(header_pic, self.watermark_manager.header_config)
+                        print("✅ Encabezado configurado como marca de agua en páginas 2+")
+                        
                     except Exception as e:
-                        print(f"Error agregando insignia: {e}")
+                        print(f"⚠️ Error configurando marca de agua, usando imagen simple: {e}")
+                        # Si falla, usar método simple
+                        self.watermark_manager.add_simple_header_image(section, ruta_encabezado)
+                else:
+                    # Modo normal - agregar imagen simple con dimensiones correctas
+                    header_pic = run.add_picture(ruta_encabezado, width=Cm(20.96))
+                    print("✅ Encabezado agregado en modo normal a páginas 2+")
             
             else:
-                # Fallback - encabezado de texto
+                # Fallback - encabezado de texto simple para páginas 2+
                 self._configurar_encabezado_simple(section, app_instance)
+            
+            # IMPORTANTE: NO agregar nada al first_page_header
+            # La insignia se agregará en la portada, NO en el encabezado de primera página
                 
         except Exception as e:
             print(f"Error configurando encabezado: {e}")
             # Usar encabezado simple como fallback
             self._configurar_encabezado_simple(section, app_instance)
+    
+    def _configurar_encabezado_simple(self, section, app_instance):
+        """Configura un encabezado de texto simple para páginas 2+ solamente"""
+        try:
+            # Solo configurar el header principal (páginas 2+)
+            header = section.header
+            
+            # Limpiar header existente
+            for para in header.paragraphs:
+                p = para._element
+                p.getparent().remove(p)
+            
+            # Agregar texto simple
+            p = header.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            institucion = app_instance.proyecto_data.get('institucion', None)
+            if institucion and hasattr(institucion, 'get'):
+                texto = institucion.get() or "INSTITUCIÓN EDUCATIVA"
+            else:
+                texto = "INSTITUCIÓN EDUCATIVA"
+            
+            run = p.add_run(texto.upper())
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(14)
+            run.font.bold = True
+            
+            print("✅ Encabezado de texto configurado para páginas 2+")
+            
+        except Exception as e:
+            print(f"Error configurando encabezado simple: {e}")
+    
     def configurar_estilos_profesionales(self, doc, app_instance):
         """Configura estilos profesionales del documento"""
         # Estilo normal
@@ -217,15 +262,29 @@ class DocumentGenerator:
             heading_style.paragraph_format.outline_level = i - 1
     
     def crear_portada_profesional(self, doc, app_instance):
-        """Crea portada profesional con formato mejorado"""
-        # Logo/emblema si existe
-        ruta_imagen = self.obtener_ruta_imagen("insignia", app_instance)
-        if ruta_imagen and os.path.exists(ruta_imagen):
+        """Crea portada profesional con formato mejorado - SIN duplicar insignia"""
+        # Logo/emblema si existe - SOLO UNA VEZ en la portada
+        ruta_insignia = self.obtener_ruta_imagen("insignia", app_instance)
+        if ruta_insignia and os.path.exists(ruta_insignia):
             try:
-                p = doc.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = p.add_run()
-                run.add_picture(ruta_imagen, width=Inches(1.5))
+                # Usar el watermark_manager para agregar la insignia con dimensiones correctas
+                if hasattr(self, 'watermark_manager'):
+                    p = doc.add_paragraph()
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = p.add_run()
+                    # Usar altura específica del logo_config
+                    run.add_picture(ruta_insignia, height=self.watermark_manager.logo_config['height'])
+                else:
+                    # Fallback al método original
+                    p = doc.add_paragraph()
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = p.add_run()
+                    run.add_picture(ruta_insignia, width=Inches(1.5))
+                
+                # Espacio después de la insignia
+                doc.add_paragraph()
+                print("✅ Insignia agregada a la portada")
+                
             except Exception as e:
                 print(f"Error cargando insignia: {e}")
         
