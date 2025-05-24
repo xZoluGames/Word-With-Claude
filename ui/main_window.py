@@ -17,7 +17,6 @@ from modules.citations import CitationProcessor
 from modules.references import ReferenceManager
 from modules.sections import SectionManager
 from .dialogs import SeccionDialog
-# Agregar AL INICIO de ui/main_window.py, ANTES de la clase ProyectoAcademicoGenerator
 
 # Clase FontManager para gestión de fuentes
 class FontManager:
@@ -83,7 +82,6 @@ class FontManager:
     def get_current_scale(self):
         """Obtiene la escala actual"""
         return self.scale
-
 class ToolTip:
     """Clase para crear tooltips en widgets de CustomTkinter"""
     def __init__(self, widget, text='tooltip'):
@@ -2794,7 +2792,329 @@ para tu institución y tipo de proyecto.
         self.watermark_mode = self.mode_var.get()
         self.watermark_stretch = self.stretch_var.get()
         messagebox.showinfo("✅ Aplicado", "Configuración de marca de agua actualizada")
-    
+    # Agregar estos métodos dentro de la clase ProyectoAcademicoGenerator en ui/main_window.py
+
+    def importar_bibtex(self):
+        """Importa referencias desde archivo BibTeX"""
+        from tkinter import filedialog
+        
+        filename = filedialog.askopenfilename(
+            title="Seleccionar archivo BibTeX",
+            filetypes=[("Archivos BibTeX", "*.bib"), ("Todos los archivos", "*.*")]
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    contenido_bibtex = f.read()
+                
+                # Usar el ReferenceManager para importar
+                referencias_antes = len(self.referencias)
+                
+                # Parsear entradas BibTeX básicas
+                import re
+                entradas = re.findall(r'@\w+\{[^}]+\}', contenido_bibtex, re.DOTALL)
+                
+                referencias_importadas = 0
+                for entrada in entradas:
+                    try:
+                        # Extraer tipo
+                        tipo_match = re.match(r'@(\w+)\{', entrada)
+                        tipo = tipo_match.group(1) if tipo_match else 'Libro'
+                        
+                        # Extraer campos
+                        ref_data = {'tipo': tipo}
+                        
+                        # Buscar autor
+                        autor_match = re.search(r'author\s*=\s*["{]([^"}]+)["}]', entrada, re.IGNORECASE)
+                        if autor_match:
+                            ref_data['autor'] = autor_match.group(1).strip()
+                        
+                        # Buscar año
+                        year_match = re.search(r'year\s*=\s*["{]?(\d{4})["}]?', entrada, re.IGNORECASE)
+                        if year_match:
+                            ref_data['año'] = year_match.group(1)
+                        
+                        # Buscar título
+                        title_match = re.search(r'title\s*=\s*["{]([^"}]+)["}]', entrada, re.IGNORECASE)
+                        if title_match:
+                            ref_data['titulo'] = title_match.group(1).strip()
+                        
+                        # Buscar fuente (journal, publisher, etc.)
+                        fuente_match = re.search(r'(?:journal|publisher|booktitle)\s*=\s*["{]([^"}]+)["}]', entrada, re.IGNORECASE)
+                        if fuente_match:
+                            ref_data['fuente'] = fuente_match.group(1).strip()
+                        else:
+                            ref_data['fuente'] = ''
+                        
+                        # Agregar si tiene los campos mínimos
+                        if all(key in ref_data for key in ['autor', 'año', 'titulo']):
+                            self.referencias.append(ref_data)
+                            referencias_importadas += 1
+                            
+                    except Exception as e:
+                        print(f"Error procesando entrada: {e}")
+                        continue
+                
+                # Actualizar lista visual
+                self.actualizar_lista_referencias()
+                
+                # Actualizar contador
+                if hasattr(self, 'ref_stats_label'):
+                    self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+                
+                messagebox.showinfo("✅ Importación Exitosa", 
+                    f"Se importaron {referencias_importadas} referencias desde el archivo BibTeX")
+                    
+            except Exception as e:
+                messagebox.showerror("❌ Error", f"Error al importar archivo BibTeX:\n{str(e)}")
+
+    def eliminar_referencias_seleccionadas(self):
+        """Elimina las referencias seleccionadas"""
+        # Por ahora, elimina la última referencia
+        # En una implementación completa, manejaría checkboxes de selección
+        if self.referencias:
+            respuesta = messagebox.askyesno("🗑️ Confirmar", 
+                "¿Eliminar la última referencia agregada?")
+            
+            if respuesta:
+                self.referencias.pop()
+                self.actualizar_lista_referencias()
+                
+                # Actualizar contador
+                if hasattr(self, 'ref_stats_label'):
+                    self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+                
+                messagebox.showinfo("✅ Eliminada", "Referencia eliminada correctamente")
+        else:
+            messagebox.showwarning("⚠️ Sin referencias", "No hay referencias para eliminar")
+
+    def exportar_referencias_apa(self):
+        """Exporta las referencias en formato APA"""
+        if not self.referencias:
+            messagebox.showwarning("⚠️ Sin referencias", "No hay referencias para exportar")
+            return
+        
+        from tkinter import filedialog
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Archivo de texto", "*.txt"), ("Todos los archivos", "*.*")],
+            title="Exportar Referencias APA"
+        )
+        
+        if filename:
+            try:
+                # Ordenar referencias por autor
+                referencias_ordenadas = sorted(self.referencias, 
+                                            key=lambda x: x['autor'].split(',')[0].strip())
+                
+                # Generar formato APA
+                referencias_apa = []
+                for ref in referencias_ordenadas:
+                    apa_ref = self._formatear_referencia_apa_export(ref)
+                    referencias_apa.append(apa_ref)
+                
+                # Escribir archivo
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write("REFERENCIAS\n")
+                    f.write("="*50 + "\n\n")
+                    f.write("\n\n".join(referencias_apa))
+                
+                messagebox.showinfo("✅ Exportado", 
+                    f"Referencias exportadas exitosamente:\n{filename}")
+                    
+            except Exception as e:
+                messagebox.showerror("❌ Error", f"Error al exportar referencias:\n{str(e)}")
+
+    def _formatear_referencia_apa_export(self, ref):
+        """Formatea una referencia individual para exportación"""
+        tipo = ref.get('tipo', 'Libro')
+        autor = ref.get('autor', '')
+        año = ref.get('año', '')
+        titulo = ref.get('titulo', '')
+        fuente = ref.get('fuente', '')
+        
+        if tipo == 'Libro':
+            return f"{autor} ({año}). {titulo}. {fuente}."
+        elif tipo == 'Artículo':
+            return f"{autor} ({año}). {titulo}. {fuente}."
+        elif tipo == 'Web':
+            return f"{autor} ({año}). {titulo}. Recuperado de {fuente}"
+        elif tipo == 'Tesis':
+            return f"{autor} ({año}). {titulo} [Tesis]. {fuente}."
+        elif tipo == 'Conferencia':
+            return f"{autor} ({año}). {titulo}. Presentado en {fuente}."
+        elif tipo == 'Informe':
+            return f"{autor} ({año}). {titulo}. {fuente}."
+        else:
+            return f"{autor} ({año}). {titulo}. {fuente}."
+
+    def filtrar_referencias(self, event=None):
+        """Filtra las referencias según el término de búsqueda"""
+        termino = self.ref_search.get().lower() if hasattr(self, 'ref_search') else ""
+        
+        # Limpiar lista actual
+        for widget in self.ref_scroll_frame.winfo_children():
+            widget.destroy()
+        
+        # Mostrar solo referencias que coincidan
+        referencias_filtradas = []
+        for ref in self.referencias:
+            if (termino in ref['autor'].lower() or 
+                termino in ref['titulo'].lower() or 
+                termino in ref.get('fuente', '').lower() or
+                termino in ref.get('año', '')):
+                referencias_filtradas.append(ref)
+        
+        # Recrear lista visual con referencias filtradas
+        for ref in referencias_filtradas:
+            ref_item_frame = ctk.CTkFrame(self.ref_scroll_frame, fg_color="gray20", corner_radius=8)
+            ref_item_frame.pack(fill="x", padx=5, pady=5)
+            
+            apa_ref = self._formatear_referencia_apa_export(ref)
+            ref_label = ctk.CTkLabel(
+                ref_item_frame, text=f"📖 {apa_ref}", 
+                font=ctk.CTkFont(size=11),
+                wraplength=800, justify="left"
+            )
+            ref_label.pack(padx=15, pady=10, anchor="w")
+        
+        # Mostrar mensaje si no hay coincidencias
+        if not referencias_filtradas and termino:
+            no_results_label = ctk.CTkLabel(
+                self.ref_scroll_frame, 
+                text="No se encontraron referencias que coincidan con la búsqueda",
+                font=ctk.CTkFont(size=12),
+                text_color="gray60"
+            )
+            no_results_label.pack(pady=20)
+
+    def actualizar_opacidad_preview(self, value):
+        """Actualiza el valor de opacidad de la marca de agua"""
+        self.watermark_opacity = float(value)
+        if hasattr(self, 'opacity_label'):
+            self.opacity_label.configure(text=f"{int(self.watermark_opacity * 100)}%")
+
+    def limpiar_validacion(self):
+        """Limpia el área de validación"""
+        if hasattr(self, 'validation_text'):
+            self.validation_text.delete("1.0", "end")
+            self.anunciar_estado("Panel de validación limpiado")
+
+    def mostrar_logs(self):
+        """Muestra los logs del sistema"""
+        logs = []
+        logs.append("📋 LOGS DEL SISTEMA\n")
+        logs.append("="*60 + "\n\n")
+        
+        from datetime import datetime
+        
+        # Log de inicio
+        logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Sistema iniciado\n")
+        logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Imágenes base cargadas\n")
+        
+        # Logs de actividad
+        if hasattr(self, 'project_manager') and hasattr(self.project_manager, 'last_save_time'):
+            if self.project_manager.last_save_time:
+                logs.append(f"[{self.project_manager.last_save_time.strftime('%H:%M:%S')}] Proyecto guardado\n")
+        
+        # Estado actual
+        logs.append(f"\n📊 ESTADO ACTUAL:\n")
+        logs.append(f"   • Secciones activas: {len(self.secciones_activas)}\n")
+        logs.append(f"   • Referencias: {len(self.referencias)}\n")
+        logs.append(f"   • Palabras totales: {self.stats.get('total_words', 0)}\n")
+        
+        self.validation_text.insert("1.0", ''.join(logs))
+
+    def mostrar_sugerencias(self):
+        """Muestra sugerencias inteligentes para mejorar el proyecto"""
+        sugerencias = []
+        sugerencias.append("💡 SUGERENCIAS INTELIGENTES\n")
+        sugerencias.append("="*60 + "\n\n")
+        
+        # Analizar estado del proyecto
+        palabras_totales = self.stats.get('total_words', 0)
+        secciones_completas = self.stats.get('sections_completed', 0)
+        referencias_total = len(self.referencias)
+        
+        # Sugerencias basadas en análisis
+        if palabras_totales < 1000:
+            sugerencias.append("📝 CONTENIDO:\n")
+            sugerencias.append("   • El proyecto tiene pocas palabras. Considera expandir las secciones principales.\n")
+            sugerencias.append("   • Objetivo mínimo recomendado: 3000-5000 palabras\n\n")
+        
+        if referencias_total < 5:
+            sugerencias.append("📚 REFERENCIAS:\n")
+            sugerencias.append("   • Agrega más referencias bibliográficas (mínimo 10-15 recomendadas)\n")
+            sugerencias.append("   • Incluye fuentes variadas: libros, artículos, sitios web confiables\n\n")
+        
+        # Verificar secciones críticas
+        secciones_vacias = []
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles and seccion_id in self.content_texts:
+                seccion = self.secciones_disponibles[seccion_id]
+                if seccion.get('requerida', False) and not seccion.get('capitulo', False):
+                    content = self.content_texts[seccion_id].get("1.0", "end").strip()
+                    if len(content) < 50:
+                        secciones_vacias.append(seccion['titulo'])
+        
+        if secciones_vacias:
+            sugerencias.append("⚠️ SECCIONES REQUERIDAS VACÍAS:\n")
+            for seccion in secciones_vacias:
+                sugerencias.append(f"   • {seccion}\n")
+            sugerencias.append("\n")
+        
+        # Sugerencias de formato
+        sugerencias.append("🎨 FORMATO Y ESTILO:\n")
+        if self.formato_config.get('interlineado', 2.0) != 2.0:
+            sugerencias.append("   • Considera usar interlineado doble (estándar académico)\n")
+        
+        # Sugerencias de mejora
+        sugerencias.append("\n✨ MEJORAS RECOMENDADAS:\n")
+        sugerencias.append("   • Revisa la coherencia entre objetivos y conclusiones\n")
+        sugerencias.append("   • Asegúrate de citar todas las referencias en el texto\n")
+        sugerencias.append("   • Incluye gráficos o tablas si son relevantes\n")
+        sugerencias.append("   • Verifica ortografía y gramática antes de generar\n")
+        
+        self.validation_text.insert("1.0", ''.join(sugerencias))
+
+    def cambiar_modo_preview(self, valor):
+        """Cambia el modo de vista previa"""
+        self.actualizar_preview()
+
+    def generar_preview_formato(self):
+        """Genera vista previa con formato aplicado"""
+        preview = []
+        preview.append("VISTA PREVIA CON FORMATO\n")
+        preview.append("="*40 + "\n\n")
+        
+        # Mostrar configuración actual
+        preview.append("📋 FORMATO APLICADO:\n")
+        preview.append(f"   • Fuente: {self.formato_config['fuente_texto']} {self.formato_config['tamaño_texto']}pt\n")
+        preview.append(f"   • Títulos: {self.formato_config['fuente_titulo']} {self.formato_config['tamaño_titulo']}pt\n")
+        preview.append(f"   • Interlineado: {self.formato_config['interlineado']}\n")
+        preview.append(f"   • Márgenes: {self.formato_config['margen']}cm\n")
+        preview.append(f"   • Justificado: {'Sí' if self.formato_config['justificado'] else 'No'}\n")
+        preview.append(f"   • Sangría: {'Sí' if self.formato_config['sangria'] else 'No'}\n\n")
+        
+        preview.append("-"*40 + "\n\n")
+        
+        # Ejemplo de texto formateado
+        preview.append("INTRODUCCIÓN\n\n")
+        preview.append("     Este es un ejemplo de cómo se verá el texto con el formato aplicado. ")
+        preview.append("La primera línea de cada párrafo tendrá sangría si está activada. ")
+        preview.append("El texto estará justificado para una apariencia profesional.\n\n")
+        
+        preview.append("     Un segundo párrafo mostraría la consistencia del formato. ")
+        preview.append("Las citas aparecerían así (García, 2020) integradas en el texto.\n\n")
+        
+        return ''.join(preview)
+
+    def ocultar_preview(self):
+        """Oculta la ventana de vista previa en lugar de destruirla"""
+        if hasattr(self, 'preview_window'):
+            self.preview_window.withdraw()
     def run(self):
         """Ejecuta la aplicación"""
         self.root.mainloop()
