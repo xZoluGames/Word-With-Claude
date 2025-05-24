@@ -27,7 +27,13 @@ class ProyectoAcademicoGenerator:
         self.template_manager = obtener_template_manager()
         # Hacer la ventana redimensionable
         self.root.minsize(1000, 600)
+        self.configurar_ventana_responsiva()
         
+        # Inicializar gestor de fuentes
+        self.font_manager = FontManager()
+        
+        # Configurar atajos mejorados
+        self.configurar_atajos_accesibilidad()
         # Inicializar componentes modulares
         self.project_manager = ProjectManager()
         self.document_generator = DocumentGenerator()
@@ -456,184 +462,541 @@ class ProyectoAcademicoGenerator:
             self.proyecto_data[key] = entry
     
     def setup_contenido_dinamico(self):
-        """Pestaña de contenido con gestión dinámica de secciones - más compacta"""
+        """Pestaña de contenido con gestión dinámica de secciones mejorada"""
         tab = self.tabview.add("📝 Contenido Dinámico")
         
-        # Frame principal dividido
-        main_container = ctk.CTkFrame(tab, fg_color="transparent")
-        main_container.pack(fill="both", expand=True, padx=10, pady=10)
+        # Frame principal con PanedWindow para redimensionar
+        paned_window = ctk.CTkFrame(tab, fg_color="transparent")
+        paned_window.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Panel de control de secciones (izquierda) - más compacto
-        control_frame = ctk.CTkFrame(main_container, width=280, corner_radius=10)
+        # Panel de control izquierdo - REDIMENSIONABLE
+        control_frame = ctk.CTkFrame(paned_window, width=320, corner_radius=10)
         control_frame.pack(side="left", fill="y", padx=(0, 10))
-        control_frame.pack_propagate(False)
         
-        ctk.CTkLabel(
-            control_frame, text="🛠️ Gestión de Secciones",
+        # Header del panel con botón de colapsar
+        header_frame = ctk.CTkFrame(control_frame, fg_color="gray25", height=45)
+        header_frame.pack(fill="x")
+        header_frame.pack_propagate(False)
+        
+        # Botón colapsar
+        self.sidebar_collapsed = False
+        collapse_btn = ctk.CTkButton(
+            header_frame, text="◀", width=30, height=30,
+            command=self.toggle_sidebar,
+            font=ctk.CTkFont(size=14)
+        )
+        collapse_btn.pack(side="left", padx=5, pady=7)
+        
+        title_label = ctk.CTkLabel(
+            header_frame, text="🛠️ Gestión de Secciones",
             font=ctk.CTkFont(size=14, weight="bold")
-        ).pack(pady=(10, 8))
+        )
+        title_label.pack(side="left", padx=(5, 0))
         
-        # Botones de gestión - más compactos
+        # Frame de búsqueda
+        search_frame = ctk.CTkFrame(control_frame, height=45)
+        search_frame.pack(fill="x", padx=8, pady=(8, 4))
+        
+        search_icon = ctk.CTkLabel(search_frame, text="🔍", font=ctk.CTkFont(size=12))
+        search_icon.pack(side="left", padx=(8, 4))
+        
+        self.search_entry = ctk.CTkEntry(
+            search_frame, placeholder_text="Buscar sección...",
+            height=30, font=ctk.CTkFont(size=11)
+        )
+        self.search_entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        self.search_entry.bind("<KeyRelease>", self.filtrar_secciones)
+        
+        # Botones de gestión mejorados
         btn_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=8, pady=(0, 8))
+        btn_frame.pack(fill="x", padx=8, pady=(4, 8))
         
-        add_btn = ctk.CTkButton(btn_frame, text="➕", command=self.agregar_seccion, width=60, height=28)
-        add_btn.pack(side="left", padx=(0, 3))
+        # Primera fila de botones
+        btn_row1 = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        btn_row1.pack(fill="x", pady=2)
         
-        remove_btn = ctk.CTkButton(btn_frame, text="➖", command=self.quitar_seccion, 
-                                 width=60, height=28, fg_color="red", hover_color="darkred")
-        remove_btn.pack(side="left", padx=(0, 3))
+        add_btn = ctk.CTkButton(
+            btn_row1, text="➕ Agregar", command=self.agregar_seccion,
+            width=90, height=30, font=ctk.CTkFont(size=11)
+        )
+        add_btn.pack(side="left", padx=(0, 4))
         
-        edit_btn = ctk.CTkButton(btn_frame, text="✏️", command=self.editar_seccion, width=60, height=28)
+        remove_btn = ctk.CTkButton(
+            btn_row1, text="➖ Quitar", command=self.quitar_seccion,
+            width=90, height=30, fg_color="red", hover_color="darkred",
+            font=ctk.CTkFont(size=11)
+        )
+        remove_btn.pack(side="left", padx=(0, 4))
+        
+        edit_btn = ctk.CTkButton(
+            btn_row1, text="✏️ Editar", command=self.editar_seccion,
+            width=90, height=30, font=ctk.CTkFont(size=11)
+        )
         edit_btn.pack(side="left")
         
-        # Lista de secciones activas
-        ctk.CTkLabel(control_frame, text="Secciones:", font=ctk.CTkFont(size=12, weight="bold")).pack(anchor="w", padx=8, pady=(8, 5))
+        # Segunda fila - botones de orden
+        btn_row2 = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        btn_row2.pack(fill="x", pady=2)
         
-        self.secciones_listbox = ctk.CTkScrollableFrame(control_frame, height=240)
+        up_btn = ctk.CTkButton(
+            btn_row2, text="⬆️ Subir", command=self.subir_seccion,
+            width=90, height=30, font=ctk.CTkFont(size=11)
+        )
+        up_btn.pack(side="left", padx=(0, 4))
+        
+        down_btn = ctk.CTkButton(
+            btn_row2, text="⬇️ Bajar", command=self.bajar_seccion,
+            width=90, height=30, font=ctk.CTkFont(size=11)
+        )
+        down_btn.pack(side="left", padx=(0, 4))
+        
+        # Botón de vista previa
+        preview_btn = ctk.CTkButton(
+            btn_row2, text="👁️ Preview", command=self.mostrar_preview,
+            width=90, height=30, fg_color="purple", hover_color="darkviolet",
+            font=ctk.CTkFont(size=11)
+        )
+        preview_btn.pack(side="left")
+        
+        # Lista de secciones mejorada con scroll
+        list_label = ctk.CTkLabel(
+            control_frame, text="📋 Secciones Activas:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        list_label.pack(anchor="w", padx=8, pady=(8, 4))
+        
+        # Scrollable frame mejorado
+        self.secciones_listbox = ctk.CTkScrollableFrame(
+            control_frame, label_text="",
+            fg_color="gray15", corner_radius=8
+        )
         self.secciones_listbox.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         
-        # Botones de orden - más compactos
-        order_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
-        order_frame.pack(fill="x", padx=8, pady=(0, 8))
+        # Panel de contenido (derecha) - EXPANDIBLE
+        self.content_container = ctk.CTkFrame(paned_window, corner_radius=10)
+        self.content_container.pack(side="right", fill="both", expand=True)
         
-        up_btn = ctk.CTkButton(order_frame, text="⬆️", command=self.subir_seccion, width=80, height=28)
-        up_btn.pack(side="left", padx=(0, 5))
+        # Breadcrumb navigation
+        breadcrumb_frame = ctk.CTkFrame(self.content_container, height=35, fg_color="gray25")
+        breadcrumb_frame.pack(fill="x", padx=8, pady=(8, 4))
+        breadcrumb_frame.pack_propagate(False)
         
-        down_btn = ctk.CTkButton(order_frame, text="⬇️", command=self.bajar_seccion, width=80, height=28)
-        down_btn.pack(side="right")
+        self.breadcrumb_label = ctk.CTkLabel(
+            breadcrumb_frame, text="📍 Navegación: ",
+            font=ctk.CTkFont(size=11), anchor="w"
+        )
+        self.breadcrumb_label.pack(side="left", padx=10, fill="x", expand=True)
         
-        # Panel de contenido (derecha)
-        content_container = ctk.CTkFrame(main_container, corner_radius=10)
-        content_container.pack(side="right", fill="both", expand=True)
+        # Sub-tabview mejorado
+        self.content_tabview = ctk.CTkTabview(
+            self.content_container,
+            segmented_button_selected_color="darkblue",
+            segmented_button_selected_hover_color="blue"
+        )
+        self.content_tabview.pack(expand=True, fill="both", padx=8, pady=(4, 8))
         
-        # Sub-tabview para secciones de contenido - altura reducida
-        self.content_tabview = ctk.CTkTabview(content_container, width=700, height=420)
-        self.content_tabview.pack(expand=True, fill="both", padx=8, pady=8)
+        # Guardar referencias
+        self.control_frame = control_frame
         
-        # Actualizar lista de secciones y crear pestañas
+        # Actualizar lista y crear pestañas
         self.actualizar_lista_secciones()
         self.crear_pestanas_contenido()
-    
+
+
+    # Método para colapsar/expandir sidebar
+    def toggle_sidebar(self):
+        """Colapsa o expande el panel lateral"""
+        if self.sidebar_collapsed:
+            self.control_frame.configure(width=320)
+            self.sidebar_collapsed = False
+        else:
+            self.control_frame.configure(width=50)
+            self.sidebar_collapsed = True
+
+
+    # Método para filtrar secciones
+    def filtrar_secciones(self, event=None):
+        """Filtra las secciones según el término de búsqueda"""
+        termino = self.search_entry.get().lower()
+        
+        # Actualizar la lista mostrando solo las coincidencias
+        for widget in self.secciones_listbox.winfo_children():
+            widget.destroy()
+        
+        for i, seccion_id in enumerate(self.secciones_activas):
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                
+                # Verificar si coincide con el término de búsqueda
+                if termino in seccion['titulo'].lower() or termino in seccion_id.lower():
+                    self.crear_item_seccion(i, seccion_id, seccion)
+
+
+    # Método mejorado para crear items de sección
+    def crear_item_seccion(self, index, seccion_id, seccion):
+        """Crea un item visual mejorado para una sección"""
+        # Frame contenedor con hover effect
+        item_frame = ctk.CTkFrame(
+            self.secciones_listbox, 
+            fg_color="gray20", 
+            corner_radius=8,
+            height=60
+        )
+        item_frame.pack(fill="x", pady=3, padx=5)
+        
+        # Checkbox
+        checkbox = ctk.CTkCheckBox(
+            item_frame, text="", width=20,
+            command=lambda idx=index: self.seleccionar_seccion(idx)
+        )
+        checkbox.pack(side="left", padx=(10, 5), pady=5)
+        checkbox.seccion_index = index
+        
+        # Contenedor de información
+        info_frame = ctk.CTkFrame(item_frame, fg_color="transparent")
+        info_frame.pack(side="left", fill="both", expand=True, pady=5)
+        
+        # Título con color según tipo
+        color = "yellow" if seccion['requerida'] else "white"
+        if seccion['capitulo']:
+            color = "lightblue"
+        
+        title_label = ctk.CTkLabel(
+            info_frame, text=seccion['titulo'],
+            font=ctk.CTkFont(size=12, weight="bold"),
+            text_color=color, anchor="w"
+        )
+        title_label.pack(fill="x", padx=(0, 10))
+        
+        # Subtítulo con tipo
+        tipo = "Capítulo" if seccion['capitulo'] else "Sección"
+        if seccion['requerida']:
+            tipo += " (Requerida)"
+        
+        subtitle_label = ctk.CTkLabel(
+            info_frame, text=tipo,
+            font=ctk.CTkFont(size=10),
+            text_color="gray60", anchor="w"
+        )
+        subtitle_label.pack(fill="x", padx=(0, 10))
+        
+        # Botón de acceso rápido
+        quick_btn = ctk.CTkButton(
+            item_frame, text="→", width=30, height=30,
+            command=lambda: self.ir_a_seccion(seccion_id),
+            font=ctk.CTkFont(size=14)
+        )
+        quick_btn.pack(side="right", padx=10)
+        
+        # Efecto hover
+        def on_enter(e):
+            item_frame.configure(fg_color="gray25")
+        
+        def on_leave(e):
+            item_frame.configure(fg_color="gray20")
+        
+        item_frame.bind("<Enter>", on_enter)
+        item_frame.bind("<Leave>", on_leave)
+
+
+    # Método para ir directamente a una sección
+    def ir_a_seccion(self, seccion_id):
+        """Navega directamente a una sección específica"""
+        # Buscar la pestaña correspondiente
+        for tab_name in self.content_tabview._tab_dict.keys():
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                if tab_name == seccion['titulo']:
+                    self.content_tabview.set(tab_name)
+                    # Actualizar breadcrumb
+                    self.breadcrumb_label.configure(
+                        text=f"📍 Navegación: Contenido > {seccion['titulo']}"
+                    )
+                    break
+
     def setup_citas_referencias(self):
-        """Pestaña para gestión de citas más compacta"""
+        """Pestaña para gestión de citas mejorada con más espacio y funcionalidad"""
         tab = self.tabview.add("📚 Citas y Referencias")
         
-        main_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=15, pady=15)
+        # Contenedor principal con scroll
+        main_scroll = ctk.CTkScrollableFrame(tab, label_text="")
+        main_scroll.pack(fill="both", expand=True, padx=15, pady=15)
         
-        # Panel de instrucciones más compacto
-        instruc_frame = ctk.CTkFrame(main_frame, fg_color="gray15", corner_radius=10, height=120)
+        # Panel de instrucciones colapsable
+        instruc_frame = ctk.CTkFrame(main_scroll, fg_color="gray15", corner_radius=10)
         instruc_frame.pack(fill="x", pady=(0, 15))
-        instruc_frame.pack_propagate(False)
+        
+        # Header con botón de colapsar
+        instruc_header = ctk.CTkFrame(instruc_frame, fg_color="gray20", height=40)
+        instruc_header.pack(fill="x")
+        instruc_header.pack_propagate(False)
+        
+        self.instruc_collapsed = False
+        
+        def toggle_instructions():
+            if self.instruc_collapsed:
+                instruc_content.pack(fill="x", padx=15, pady=(0, 15))
+                collapse_btn.configure(text="▼")
+            else:
+                instruc_content.pack_forget()
+                collapse_btn.configure(text="▶")
+            self.instruc_collapsed = not self.instruc_collapsed
+        
+        collapse_btn = ctk.CTkButton(
+            instruc_header, text="▼", width=30, height=25,
+            command=toggle_instructions,
+            fg_color="transparent", hover_color="gray30"
+        )
+        collapse_btn.pack(side="left", padx=(10, 5))
         
         instruc_title = ctk.CTkLabel(
-            instruc_frame, text="🚀 SISTEMA DE CITAS",
+            instruc_header, text="🚀 SISTEMA DE CITAS - Guía Rápida",
             font=ctk.CTkFont(size=14, weight="bold"), text_color="lightgreen"
         )
-        instruc_title.pack(pady=(10, 5))
+        instruc_title.pack(side="left", pady=10)
         
-        ejemplos_text = "📝 [CITA:textual:García:2020:45] • 🔄 [CITA:parafraseo:López:2019] • 📖 [CITA:larga:Martínez:2021]"
-        ctk.CTkLabel(
-            instruc_frame, text=ejemplos_text,
-            font=ctk.CTkFont(size=11), text_color="lightblue", wraplength=900
-        ).pack(pady=2)
+        # Contenido de instrucciones
+        instruc_content = ctk.CTkFrame(instruc_frame, fg_color="transparent")
+        instruc_content.pack(fill="x", padx=15, pady=(0, 15))
         
-        ctk.CTkLabel(
-            instruc_frame, text="✨ Conversión automática a formato APA",
-            font=ctk.CTkFont(size=10, weight="bold"), text_color="yellow"
-        ).pack(pady=(2, 10))
+        # Grid de ejemplos
+        ejemplos_frame = ctk.CTkFrame(instruc_content, fg_color="transparent")
+        ejemplos_frame.pack(fill="x")
         
-        # Frame para agregar referencias - más compacto
-        ref_frame = ctk.CTkFrame(main_frame, height=140)
+        ejemplos = [
+            ("📝 Textual corta", "[CITA:textual:García:2020:45]", "(García, 2020, p. 45)"),
+            ("🔄 Parafraseo", "[CITA:parafraseo:López:2019]", "(López, 2019)"),
+            ("📖 Textual larga", "[CITA:larga:Martínez:2021:78]", "Bloque con sangría"),
+            ("👥 Múltiples autores", "[CITA:multiple:García y López:2020]", "(García y López, 2020)"),
+            ("🌐 Fuente web", "[CITA:web:OMS:2023]", "(OMS, 2023)"),
+            ("💬 Comunicación personal", "[CITA:personal:Pérez:2022:email]", "(Pérez, comunicación personal, 2022)")
+        ]
+        
+        for i, (tipo, formato, resultado) in enumerate(ejemplos):
+            row = i // 2
+            col = i % 2
+            
+            ejemplo_frame = ctk.CTkFrame(ejemplos_frame, fg_color="gray25", corner_radius=8)
+            ejemplo_frame.pack(side="left", fill="x", expand=True, padx=5, pady=2)
+            
+            ctk.CTkLabel(
+                ejemplo_frame, text=tipo,
+                font=ctk.CTkFont(size=11, weight="bold")
+            ).pack(pady=(5, 2))
+            
+            ctk.CTkLabel(
+                ejemplo_frame, text=formato,
+                font=ctk.CTkFont(family="Consolas", size=10),
+                text_color="lightblue"
+            ).pack()
+            
+            ctk.CTkLabel(
+                ejemplo_frame, text=f"→ {resultado}",
+                font=ctk.CTkFont(size=10),
+                text_color="lightgreen"
+            ).pack(pady=(2, 5))
+        
+        # Panel de agregar referencias mejorado
+        ref_frame = ctk.CTkFrame(main_scroll, corner_radius=10)
         ref_frame.pack(fill="x", pady=(0, 15))
-        ref_frame.pack_propagate(False)
         
         ref_title = ctk.CTkLabel(
             ref_frame, text="➕ Agregar Referencias",
-            font=ctk.CTkFont(size=14, weight="bold")
+            font=ctk.CTkFont(size=16, weight="bold")
         )
-        ref_title.pack(pady=(10, 8))
+        ref_title.pack(pady=(15, 10))
         
-        # Campos para referencias usando pack - más compactos
-        fields_frame = ctk.CTkFrame(ref_frame, fg_color="transparent")
-        fields_frame.pack(fill="x", padx=15, pady=(0, 10))
+        # Formulario en grid para mejor organización
+        form_frame = ctk.CTkFrame(ref_frame, fg_color="transparent")
+        form_frame.pack(fill="x", padx=20, pady=(0, 15))
         
         # Primera fila
-        row1_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
-        row1_frame.pack(fill="x", pady=3)
+        row1 = ctk.CTkFrame(form_frame, fg_color="transparent")
+        row1.pack(fill="x", pady=5)
         
         # Tipo
-        tipo_frame = ctk.CTkFrame(row1_frame, fg_color="transparent")
-        tipo_frame.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ctk.CTkLabel(tipo_frame, text="Tipo:", font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-        self.ref_tipo = ctk.CTkComboBox(
-            tipo_frame,
-            values=["Libro", "Artículo", "Web", "Tesis"],
-            height=25, font=ctk.CTkFont(size=11)
-        )
-        self.ref_tipo.pack(fill="x")
+        tipo_container = ctk.CTkFrame(row1, fg_color="transparent")
+        tipo_container.pack(side="left", fill="x", expand=True, padx=(0, 10))
         
-        # Autor
-        autor_frame = ctk.CTkFrame(row1_frame, fg_color="transparent")
-        autor_frame.pack(side="right", fill="x", expand=True, padx=(5, 0))
-        ctk.CTkLabel(autor_frame, text="Autor:", font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-        self.ref_autor = ctk.CTkEntry(autor_frame, placeholder_text="Apellido, N.", height=25, font=ctk.CTkFont(size=11))
-        self.ref_autor.pack(fill="x")
+        ctk.CTkLabel(
+            tipo_container, text="Tipo de referencia:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(anchor="w")
+        
+        self.ref_tipo = ctk.CTkComboBox(
+            tipo_container,
+            values=["Libro", "Artículo", "Web", "Tesis", "Conferencia", "Informe"],
+            height=35, font=ctk.CTkFont(size=12),
+            command=self.actualizar_campos_referencia
+        )
+        self.ref_tipo.pack(fill="x", pady=(5, 0))
+        self.ref_tipo.set("Libro")
+        
+        # Autor(es)
+        autor_container = ctk.CTkFrame(row1, fg_color="transparent")
+        autor_container.pack(side="left", fill="x", expand=True, padx=(10, 0))
+        
+        ctk.CTkLabel(
+            autor_container, text="Autor(es):",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(anchor="w")
+        
+        self.ref_autor = ctk.CTkEntry(
+            autor_container, placeholder_text="Apellido, N. o García, J. y López, M.",
+            height=35, font=ctk.CTkFont(size=12)
+        )
+        self.ref_autor.pack(fill="x", pady=(5, 0))
         
         # Segunda fila
-        row2_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
-        row2_frame.pack(fill="x", pady=3)
+        row2 = ctk.CTkFrame(form_frame, fg_color="transparent")
+        row2.pack(fill="x", pady=5)
         
         # Año
-        ano_frame = ctk.CTkFrame(row2_frame, fg_color="transparent")
-        ano_frame.pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ctk.CTkLabel(ano_frame, text="Año:", font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-        self.ref_ano = ctk.CTkEntry(ano_frame, placeholder_text="2024", height=25, font=ctk.CTkFont(size=11))
-        self.ref_ano.pack(fill="x")
+        año_container = ctk.CTkFrame(row2, fg_color="transparent")
+        año_container.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        
+        ctk.CTkLabel(
+            año_container, text="Año:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(anchor="w")
+        
+        self.ref_año = ctk.CTkEntry(
+            año_container, placeholder_text="2024",
+            height=35, font=ctk.CTkFont(size=12)
+        )
+        self.ref_año.pack(fill="x", pady=(5, 0))
         
         # Título
-        titulo_frame = ctk.CTkFrame(row2_frame, fg_color="transparent")
-        titulo_frame.pack(side="right", fill="x", expand=True, padx=(5, 0))
-        ctk.CTkLabel(titulo_frame, text="Título:", font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-        self.ref_titulo = ctk.CTkEntry(titulo_frame, placeholder_text="Título", height=25, font=ctk.CTkFont(size=11))
-        self.ref_titulo.pack(fill="x")
+        titulo_container = ctk.CTkFrame(row2, fg_color="transparent")
+        titulo_container.pack(side="left", fill="x", expand=True, padx=(10, 0))
         
-        # Tercera fila
-        row3_frame = ctk.CTkFrame(fields_frame, fg_color="transparent")
-        row3_frame.pack(fill="x", pady=3)
+        ctk.CTkLabel(
+            titulo_container, text="Título:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        ).pack(anchor="w")
         
-        # Fuente
-        fuente_frame = ctk.CTkFrame(row3_frame, fg_color="transparent")
-        fuente_frame.pack(fill="x")
-        ctk.CTkLabel(fuente_frame, text="Fuente:", font=ctk.CTkFont(size=11, weight="bold")).pack(anchor="w")
-        self.ref_fuente = ctk.CTkEntry(fuente_frame, placeholder_text="Editorial o URL", height=25, font=ctk.CTkFont(size=11))
-        self.ref_fuente.pack(fill="x")
+        self.ref_titulo = ctk.CTkEntry(
+            titulo_container, placeholder_text="Título completo del trabajo",
+            height=35, font=ctk.CTkFont(size=12)
+        )
+        self.ref_titulo.pack(fill="x", pady=(5, 0))
+        
+        # Tercera fila - Campo dinámico según tipo
+        row3 = ctk.CTkFrame(form_frame, fg_color="transparent")
+        row3.pack(fill="x", pady=5)
+        
+        self.fuente_container = ctk.CTkFrame(row3, fg_color="transparent")
+        self.fuente_container.pack(fill="x")
+        
+        self.fuente_label = ctk.CTkLabel(
+            self.fuente_container, text="Editorial/Fuente:",
+            font=ctk.CTkFont(size=12, weight="bold")
+        )
+        self.fuente_label.pack(anchor="w")
+        
+        self.ref_fuente = ctk.CTkEntry(
+            self.fuente_container, placeholder_text="Editorial, revista o URL",
+            height=35, font=ctk.CTkFont(size=12)
+        )
+        self.ref_fuente.pack(fill="x", pady=(5, 0))
+        
+        # Botones de acción
+        btn_frame = ctk.CTkFrame(ref_frame, fg_color="transparent")
+        btn_frame.pack(pady=(0, 15))
         
         add_ref_btn = ctk.CTkButton(
-            ref_frame, text="➕ Agregar", command=self.agregar_referencia,
-            height=28, font=ctk.CTkFont(size=12, weight="bold"), width=120
+            btn_frame, text="➕ Agregar Referencia",
+            command=self.agregar_referencia,
+            height=40, font=ctk.CTkFont(size=13, weight="bold"),
+            width=180
         )
-        add_ref_btn.pack(pady=(5, 10))
+        add_ref_btn.pack(side="left", padx=5)
         
-        # Lista de referencias - más compacta
-        list_frame = ctk.CTkFrame(main_frame)
+        import_btn = ctk.CTkButton(
+            btn_frame, text="📥 Importar BibTeX",
+            command=self.importar_bibtex,
+            height=40, font=ctk.CTkFont(size=13),
+            width=150, fg_color="purple", hover_color="darkviolet"
+        )
+        import_btn.pack(side="left", padx=5)
+        
+        # Lista de referencias mejorada
+        list_frame = ctk.CTkFrame(main_scroll)
         list_frame.pack(fill="both", expand=True)
         
+        # Header con búsqueda y filtros
+        list_header = ctk.CTkFrame(list_frame, height=50, fg_color="gray25")
+        list_header.pack(fill="x")
+        list_header.pack_propagate(False)
+        
         list_title = ctk.CTkLabel(
-            list_frame, text="📋 Referencias Agregadas",
+            list_header, text="📋 Referencias Agregadas",
             font=ctk.CTkFont(size=14, weight="bold")
         )
-        list_title.pack(pady=(10, 8))
+        list_title.pack(side="left", padx=15)
         
-        self.ref_scroll_frame = ctk.CTkScrollableFrame(list_frame, height=140)
-        self.ref_scroll_frame.pack(fill="both", expand=True, padx=15, pady=(0, 8))
+        # Búsqueda
+        search_frame = ctk.CTkFrame(list_header, fg_color="transparent")
+        search_frame.pack(side="right", padx=15)
+        
+        ctk.CTkLabel(search_frame, text="🔍").pack(side="left", padx=(0, 5))
+        
+        self.ref_search = ctk.CTkEntry(
+            search_frame, placeholder_text="Buscar referencia...",
+            width=200, height=30
+        )
+        self.ref_search.pack(side="left")
+        self.ref_search.bind("<KeyRelease>", self.filtrar_referencias)
+        
+        # Lista scrollable con altura mayor
+        self.ref_scroll_frame = ctk.CTkScrollableFrame(
+            list_frame, height=300,
+            fg_color="gray15", corner_radius=8
+        )
+        self.ref_scroll_frame.pack(fill="both", expand=True, padx=15, pady=10)
+        
+        # Botones de gestión
+        manage_frame = ctk.CTkFrame(list_frame, fg_color="transparent")
+        manage_frame.pack(fill="x", padx=15, pady=(0, 10))
         
         delete_btn = ctk.CTkButton(
-            list_frame, text="🗑️ Eliminar Última", command=self.eliminar_referencia,
-            fg_color="red", hover_color="darkred", height=28, width=140
+            manage_frame, text="🗑️ Eliminar Seleccionadas",
+            command=self.eliminar_referencias_seleccionadas,
+            fg_color="red", hover_color="darkred",
+            height=35, width=180
         )
-        delete_btn.pack(pady=(0, 10))
+        delete_btn.pack(side="left", padx=(0, 10))
+        
+        export_btn = ctk.CTkButton(
+            manage_frame, text="📤 Exportar APA",
+            command=self.exportar_referencias_apa,
+            height=35, width=150
+        )
+        export_btn.pack(side="left", padx=(0, 10))
+        
+        stats_label = ctk.CTkLabel(
+            manage_frame, text=f"Total: {len(self.referencias)} referencias",
+            font=ctk.CTkFont(size=12)
+        )
+        stats_label.pack(side="right")
+        self.ref_stats_label = stats_label
+
+
+    # Método auxiliar para actualizar campos según tipo
+    def actualizar_campos_referencia(self, choice):
+        """Actualiza los campos del formulario según el tipo de referencia"""
+        tipos_config = {
+            "Libro": ("Editorial:", "Nombre de la editorial"),
+            "Artículo": ("Revista:", "Nombre de la revista, volumen(número), páginas"),
+            "Web": ("URL:", "https://ejemplo.com"),
+            "Tesis": ("Universidad:", "Universidad e información adicional"),
+            "Conferencia": ("Evento:", "Nombre del evento y lugar"),
+            "Informe": ("Organización:", "Organización que publica")
+        }
+        
+        label, placeholder = tipos_config.get(choice, ("Fuente:", "Información de publicación"))
+        self.fuente_label.configure(text=label)
+        self.ref_fuente.configure(placeholder_text=placeholder)
     
     def setup_formato_avanzado(self):
         """Pestaña para opciones avanzadas de formato - más compacta"""
@@ -784,93 +1147,248 @@ class ProyectoAcademicoGenerator:
         )
         apply_btn.pack(pady=15)
     
+# Modificar setup_generacion() en ui/main_window.py para incluir panel inferior
+
     def setup_generacion(self):
-        """Pestaña de generación mejorada"""
+        """Pestaña de generación con panel de validación mejorado"""
         tab = self.tabview.add("🔧 Generar")
         
-        main_frame = ctk.CTkFrame(tab, fg_color="transparent")
-        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        # Usar PanedWindow para panel redimensionable
+        paned = ctk.CTkFrame(tab, fg_color="transparent")
+        paned.pack(fill="both", expand=True, padx=20, pady=20)
         
-        # Opciones de inclusión
-        options_frame = ctk.CTkFrame(main_frame, corner_radius=15)
-        options_frame.pack(fill="x", pady=(0, 20))
+        # Panel superior - Opciones
+        top_frame = ctk.CTkFrame(paned, corner_radius=15, height=200)
+        top_frame.pack(fill="x", pady=(0, 10))
+        top_frame.pack_propagate(False)
         
         options_title = ctk.CTkLabel(
-            options_frame, text="⚙️ Opciones de Generación",
+            top_frame, text="⚙️ Opciones de Generación",
             font=ctk.CTkFont(size=18, weight="bold")
         )
         options_title.pack(pady=(20, 15))
         
-        options_grid = ctk.CTkFrame(options_frame, fg_color="transparent")
+        # Grid de opciones mejorado
+        options_grid = ctk.CTkFrame(top_frame, fg_color="transparent")
         options_grid.pack(padx=30, pady=(0, 20))
         
-        # Primera fila de opciones
-        options_row1 = ctk.CTkFrame(options_grid, fg_color="transparent")
-        options_row1.pack(fill="x", pady=5)
+        # Opciones en columnas
+        col1 = ctk.CTkFrame(options_grid, fg_color="transparent")
+        col1.pack(side="left", fill="both", expand=True, padx=20)
         
+        col2 = ctk.CTkFrame(options_grid, fg_color="transparent")
+        col2.pack(side="left", fill="both", expand=True, padx=20)
+        
+        # Columna 1
         self.incluir_portada = ctk.CTkCheckBox(
-            options_row1, text="📄 Incluir Portada", font=ctk.CTkFont(size=14)
+            col1, text="📄 Incluir Portada",
+            font=ctk.CTkFont(size=14)
         )
         self.incluir_portada.select()
-        self.incluir_portada.pack(side="left", padx=(20, 20))
+        self.incluir_portada.pack(anchor="w", pady=5)
         
         self.incluir_indice = ctk.CTkCheckBox(
-            options_row1, text="📑 Incluir Índice", font=ctk.CTkFont(size=14)
+            col1, text="📑 Incluir Índice",
+            font=ctk.CTkFont(size=14)
         )
         self.incluir_indice.select()
-        self.incluir_indice.pack(side="right", padx=(20, 20))
+        self.incluir_indice.pack(anchor="w", pady=5)
         
-        # Segunda fila de opciones
-        options_row2 = ctk.CTkFrame(options_grid, fg_color="transparent")
-        options_row2.pack(fill="x", pady=5)
-        
+        # Columna 2
         self.incluir_agradecimientos = ctk.CTkCheckBox(
-            options_row2, text="🙏 Incluir Agradecimientos", font=ctk.CTkFont(size=14)
+            col2, text="🙏 Incluir Agradecimientos",
+            font=ctk.CTkFont(size=14)
         )
-        self.incluir_agradecimientos.pack(side="left", padx=(20, 20))
+        self.incluir_agradecimientos.pack(anchor="w", pady=5)
         
         self.numeracion_paginas = ctk.CTkCheckBox(
-            options_row2, text="📊 Numeración de páginas", font=ctk.CTkFont(size=14)
+            col2, text="📊 Numeración de páginas",
+            font=ctk.CTkFont(size=14)
         )
         self.numeracion_paginas.select()
-        self.numeracion_paginas.pack(side="right", padx=(20, 20))
+        self.numeracion_paginas.pack(anchor="w", pady=5)
         
-        # Frame de validación
-        validation_frame = ctk.CTkFrame(main_frame, corner_radius=15)
-        validation_frame.pack(fill="both", expand=True)
+        # Panel inferior expandible - Validación
+        bottom_frame = ctk.CTkFrame(paned, corner_radius=15)
+        bottom_frame.pack(fill="both", expand=True)
         
-        validation_title = ctk.CTkLabel(
-            validation_frame, text="🔍 Estado del Proyecto",
-            font=ctk.CTkFont(size=18, weight="bold")
+        # Header del panel con tabs
+        header_frame = ctk.CTkFrame(bottom_frame, height=50, fg_color="gray25")
+        header_frame.pack(fill="x")
+        header_frame.pack_propagate(False)
+        
+        # Tabs de validación
+        self.validation_tabs = ctk.CTkSegmentedButton(
+            header_frame,
+            values=["🔍 Validación", "📋 Logs", "📊 Estadísticas", "💡 Sugerencias"],
+            command=self.cambiar_tab_validacion
         )
-        validation_title.pack(pady=(20, 15))
+        self.validation_tabs.pack(side="left", padx=15, pady=10)
+        self.validation_tabs.set("🔍 Validación")
         
+        # Botón de limpiar
+        clear_btn = ctk.CTkButton(
+            header_frame, text="🗑️", width=35, height=35,
+            command=self.limpiar_validacion,
+            fg_color="transparent", hover_color="gray30"
+        )
+        clear_btn.pack(side="right", padx=15)
+        
+        # Contenedor de contenido con scroll
+        self.validation_container = ctk.CTkFrame(bottom_frame)
+        self.validation_container.pack(fill="both", expand=True, padx=15, pady=10)
+        
+        # Área de texto para validación
         self.validation_text = ctk.CTkTextbox(
-            validation_frame, height=250, font=ctk.CTkFont(size=12), fg_color="gray10"
+            self.validation_container,
+            font=ctk.CTkFont(family="Consolas", size=11),
+            fg_color="gray10"
         )
-        self.validation_text.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        self.validation_text.pack(fill="both", expand=True)
         
-        # Inicializar con mensaje de bienvenida
-        self.validation_text.insert("1.0", 
-            "✨ ¡Generador Avanzado de Proyectos Académicos!\n\n"
-            "🆕 NUEVAS CARACTERÍSTICAS:\n"
-            "• Gestión dinámica de secciones\n"
-            "• Formato personalizable (fuentes, tamaños, espaciado)\n"
-            "• Uso de plantilla base del documento\n"
-            "• Reordenamiento de contenido\n"
-            "• Validación avanzada\n\n"
-            "📋 PROCESO RECOMENDADO:\n"
-            "1. Completa información general\n"
-            "2. Organiza secciones según tu necesidad\n"
-            "3. Personaliza el formato\n"
-            "4. Agrega contenido y referencias\n"
-            "5. Valida y genera\n\n"
-            "🎯 ¡Haz clic en 'Validar Proyecto' cuando estés listo!"
+        # Panel de progreso mejorado
+        progress_frame = ctk.CTkFrame(bottom_frame, height=80)
+        progress_frame.pack(fill="x", padx=15, pady=(0, 15))
+        progress_frame.pack_propagate(False)
+        
+        # Etiqueta de estado
+        self.status_label = ctk.CTkLabel(
+            progress_frame, text="🟢 Listo para validar",
+            font=ctk.CTkFont(size=12, weight="bold")
         )
+        self.status_label.pack(pady=(10, 5))
         
-        self.progress = ctk.CTkProgressBar(validation_frame, height=20)
-        self.progress.pack(fill="x", padx=20, pady=(0, 20))
+        # Barra de progreso mejorada
+        self.progress = ctk.CTkProgressBar(
+            progress_frame, height=20,
+            progress_color="green"
+        )
+        self.progress.pack(fill="x", padx=20, pady=(0, 5))
         self.progress.set(0)
+        
+        # Subtareas
+        self.subtask_label = ctk.CTkLabel(
+            progress_frame, text="",
+            font=ctk.CTkFont(size=10),
+            text_color="gray60"
+        )
+        self.subtask_label.pack()
+        
+        # Inicializar con mensaje de bienvenida mejorado
+        self.mostrar_bienvenida_validacion()
+
+
+    def mostrar_bienvenida_validacion(self):
+        """Muestra mensaje de bienvenida mejorado en el panel de validación"""
+        mensaje = """✨ GENERADOR AVANZADO DE PROYECTOS ACADÉMICOS v2.0
+        
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    🆕 MEJORAS DE INTERFAZ IMPLEMENTADAS:
+
+    📝 EDITOR MEJORADO
+        • Cuadros de texto expandibles con botón de maximizar
+        • Contador de palabras en tiempo real
+        • Altura aumentada para mejor visualización
+        • Editor modal para edición en pantalla completa
+    
+    🔍 NAVEGACIÓN OPTIMIZADA
+        • Panel lateral con búsqueda de secciones
+        • Navegación rápida con un clic
+        • Breadcrumb para ubicación actual
+        • Panel colapsable para más espacio
+    
+    📚 GESTIÓN DE REFERENCIAS
+        • Formulario mejorado con tipos adicionales
+        • Búsqueda y filtrado de referencias
+        • Importación de BibTeX
+        • Vista previa de formato APA
+    
+    👁️ VISTA PREVIA EN TIEMPO REAL
+        • Panel lateral con preview del documento
+        • Tres modos: Texto, Formato y Estructura
+        • Actualización automática
+        • Estadísticas de completitud
+    
+    📊 VALIDACIÓN AVANZADA
+        • Panel inferior con tabs
+        • Logs detallados del proceso
+        • Estadísticas en tiempo real
+        • Sugerencias inteligentes
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    💡 CONSEJOS DE USO:
+
+    1. USA EL BOTÓN ⛶ para expandir cualquier sección y editarla cómodamente
+    2. NAVEGA RÁPIDAMENTE usando el panel lateral o breadcrumb
+    3. ACTIVA LA VISTA PREVIA para ver tu documento mientras escribes
+    4. REVISA LAS SUGERENCIAS en el panel de validación
+    5. USA CTRL+S para guardar tu proyecto frecuentemente
+
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    🎯 Haz clic en 'Validar Proyecto' cuando estés listo para revisar tu trabajo
+    """
+        self.validation_text.delete("1.0", "end")
+        self.validation_text.insert("1.0", mensaje)
+
+
+    def cambiar_tab_validacion(self, valor):
+        """Cambia el contenido según la tab seleccionada"""
+        self.validation_text.delete("1.0", "end")
+        
+        if valor == "🔍 Validación":
+            # Ejecutar validación
+            self.validar_proyecto()
+        elif valor == "📋 Logs":
+            self.mostrar_logs()
+        elif valor == "📊 Estadísticas":
+            self.mostrar_estadisticas_detalladas()
+        elif valor == "💡 Sugerencias":
+            self.mostrar_sugerencias()
+
+
+    def mostrar_estadisticas_detalladas(self):
+        """Muestra estadísticas detalladas del proyecto"""
+        stats = []
+        stats.append("📊 ESTADÍSTICAS DETALLADAS DEL PROYECTO\n")
+        stats.append("="*60 + "\n\n")
+        
+        # Estadísticas por sección
+        stats.append("📝 CONTENIDO POR SECCIÓN:\n\n")
+        
+        total_palabras = 0
+        total_caracteres = 0
+        
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles and seccion_id in self.content_texts:
+                seccion = self.secciones_disponibles[seccion_id]
+                if not seccion['capitulo']:
+                    content = self.content_texts[seccion_id].get("1.0", "end").strip()
+                    palabras = len(content.split()) if content else 0
+                    caracteres = len(content)
+                    
+                    total_palabras += palabras
+                    total_caracteres += caracteres
+                    
+                    # Barra de progreso visual
+                    progreso = min(100, (palabras / 500) * 100)  # 500 palabras como objetivo
+                    barra = "█" * int(progreso / 10) + "░" * (10 - int(progreso / 10))
+                    
+                    stats.append(f"   • {seccion['titulo']:<30} {barra} {palabras:>5} palabras\n")
+        
+        stats.append(f"\n📊 TOTALES:\n")
+        stats.append(f"   • Palabras totales: {total_palabras:,}\n")
+        stats.append(f"   • Caracteres totales: {total_caracteres:,}\n")
+        stats.append(f"   • Promedio por sección: {total_palabras // max(1, len(self.secciones_activas)):,}\n")
+        stats.append(f"   • Referencias: {len(self.referencias)}\n")
+        
+        # Tiempo estimado de lectura
+        tiempo_lectura = total_palabras / 200  # 200 palabras por minuto
+        stats.append(f"   • Tiempo de lectura: {int(tiempo_lectura)} minutos\n")
+        
+        self.validation_text.insert("1.0", ''.join(stats))
     
     def setup_keyboard_shortcuts(self):
         """Configura atajos de teclado"""
@@ -1456,29 +1974,73 @@ class ProyectoAcademicoGenerator:
             if seccion_id in self.secciones_disponibles:
                 seccion = self.secciones_disponibles[seccion_id]
                 
-                if not seccion['capitulo']:  # Solo crear pestañas para contenido, no para títulos de capítulo
+                if not seccion['capitulo']:  # Solo crear pestañas para contenido
                     tab = self.content_tabview.add(seccion['titulo'])
                     
-                    # Frame de instrucciones
-                    instruc_frame = ctk.CTkFrame(tab, fg_color="gray20", corner_radius=10)
+                    # Frame principal con scroll
+                    main_frame = ctk.CTkFrame(tab, fg_color="transparent")
+                    main_frame.pack(fill="both", expand=True)
+                    
+                    # Frame de instrucciones más compacto
+                    instruc_frame = ctk.CTkFrame(main_frame, fg_color="gray20", corner_radius=10, height=60)
                     instruc_frame.pack(fill="x", padx=10, pady=(10, 5))
+                    instruc_frame.pack_propagate(False)
                     
                     instruc_label = ctk.CTkLabel(
                         instruc_frame, text=f"💡 {seccion['instruccion']}",
-                        font=ctk.CTkFont(size=12), wraplength=600, justify="left"
+                        font=ctk.CTkFont(size=11), wraplength=650, justify="left"
                     )
-                    instruc_label.pack(padx=15, pady=10)
+                    instruc_label.pack(padx=15, pady=8)
                     
-                    # Text widget
+                    # Frame contenedor para el text widget y controles
+                    text_container = ctk.CTkFrame(main_frame, fg_color="transparent")
+                    text_container.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+                    
+                    # Barra de herramientas
+                    toolbar = ctk.CTkFrame(text_container, height=35, fg_color="gray25")
+                    toolbar.pack(fill="x", pady=(0, 5))
+                    toolbar.pack_propagate(False)
+                    
+                    # Contador de palabras en tiempo real
+                    word_count_label = ctk.CTkLabel(
+                        toolbar, text="📝 Palabras: 0 | Caracteres: 0",
+                        font=ctk.CTkFont(size=10)
+                    )
+                    word_count_label.pack(side="left", padx=10)
+                    
+                    # Botón expandir
+                    expand_btn = ctk.CTkButton(
+                        toolbar, text="⛶ Expandir", width=80, height=25,
+                        command=lambda sid=seccion_id: self.expandir_editor(sid),
+                        font=ctk.CTkFont(size=11)
+                    )
+                    expand_btn.pack(side="right", padx=10)
+                    
+                    # Text widget mejorado
                     text_widget = ctk.CTkTextbox(
-                        tab, wrap="word", font=ctk.CTkFont(size=12), height=350
+                        text_container, wrap="word", 
+                        font=ctk.CTkFont(family="Consolas", size=13),
+                        height=500,  # Altura aumentada
+                        corner_radius=8,
+                        border_width=1,
+                        border_color="gray40"
                     )
-                    text_widget.pack(expand=True, fill="both", padx=10, pady=(5, 10))
+                    text_widget.pack(expand=True, fill="both")
                     
-                    # Conservar contenido existente si ya existe
+                    # Vincular evento para actualizar contador
+                    def update_count(event=None):
+                        content = text_widget.get("1.0", "end-1c")
+                        words = len(content.split())
+                        chars = len(content)
+                        word_count_label.configure(text=f"📝 Palabras: {words} | Caracteres: {chars}")
+                    
+                    text_widget.bind("<KeyRelease>", update_count)
+                    
+                    # Conservar contenido existente
                     if seccion_id in self.content_texts:
                         contenido_existente = self.content_texts[seccion_id].get("1.0", "end")
                         text_widget.insert("1.0", contenido_existente)
+                        update_count()
                     
                     self.content_texts[seccion_id] = text_widget
     
@@ -1790,3 +2352,674 @@ para tu institución y tipo de proyecto.
     def run(self):
         """Ejecuta la aplicación"""
         self.root.mainloop()
+    def expandir_editor(self, seccion_id):
+        """Abre el editor en una ventana expandida"""
+        if seccion_id not in self.content_texts:
+            return
+        
+        # Crear ventana modal
+        expand_window = ctk.CTkToplevel(self.root)
+        expand_window.title(f"✏️ Editor Expandido - {self.secciones_disponibles[seccion_id]['titulo']}")
+        
+        # Tamaño grande por defecto
+        screen_width = expand_window.winfo_screenwidth()
+        screen_height = expand_window.winfo_screenheight()
+        window_width = int(screen_width * 0.8)
+        window_height = int(screen_height * 0.8)
+        
+        expand_window.geometry(f"{window_width}x{window_height}")
+        expand_window.transient(self.root)
+        
+        # Centrar ventana
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        expand_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Frame principal
+        main_frame = ctk.CTkFrame(expand_window)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Título
+        title_label = ctk.CTkLabel(
+            main_frame, 
+            text=f"📝 {self.secciones_disponibles[seccion_id]['titulo']}",
+            font=ctk.CTkFont(size=18, weight="bold")
+        )
+        title_label.pack(pady=(10, 5))
+        
+        # Instrucciones
+        instruc_label = ctk.CTkLabel(
+            main_frame,
+            text=self.secciones_disponibles[seccion_id]['instruccion'],
+            font=ctk.CTkFont(size=12),
+            text_color="gray70"
+        )
+        instruc_label.pack(pady=(0, 10))
+        
+        # Editor expandido
+        expanded_text = ctk.CTkTextbox(
+            main_frame, wrap="word",
+            font=ctk.CTkFont(family="Consolas", size=14),
+            corner_radius=8
+        )
+        expanded_text.pack(fill="both", expand=True, pady=(0, 10))
+        
+        # Copiar contenido actual
+        current_content = self.content_texts[seccion_id].get("1.0", "end-1c")
+        expanded_text.insert("1.0", current_content)
+        
+        # Botones
+        btn_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
+        btn_frame.pack(fill="x")
+        
+        # Estadísticas
+        stats_label = ctk.CTkLabel(
+            btn_frame, text="",
+            font=ctk.CTkFont(size=11)
+        )
+        stats_label.pack(side="left")
+        
+        def update_stats(event=None):
+            content = expanded_text.get("1.0", "end-1c")
+            words = len(content.split())
+            chars = len(content)
+            lines = content.count('\n') + 1
+            stats_label.configure(
+                text=f"📊 Palabras: {words} | Caracteres: {chars} | Líneas: {lines}"
+            )
+        
+        expanded_text.bind("<KeyRelease>", update_stats)
+        update_stats()
+        
+        def save_and_close():
+            # Guardar contenido de vuelta
+            new_content = expanded_text.get("1.0", "end-1c")
+            self.content_texts[seccion_id].delete("1.0", "end")
+            self.content_texts[seccion_id].insert("1.0", new_content)
+            expand_window.destroy()
+        
+        save_btn = ctk.CTkButton(
+            btn_frame, text="💾 Guardar y Cerrar",
+            command=save_and_close,
+            fg_color="green", hover_color="darkgreen"
+        )
+        save_btn.pack(side="right", padx=(10, 0))
+        
+        cancel_btn = ctk.CTkButton(
+            btn_frame, text="❌ Cancelar",
+            command=expand_window.destroy,
+            fg_color="red", hover_color="darkred"
+        )
+        cancel_btn.pack(side="right")
+        
+        # Foco al editor
+        expanded_text.focus()
+# Agregar a ui/main_window.py
+
+    def mostrar_preview(self):
+        """Muestra vista previa del documento en panel lateral"""
+        # Crear ventana de preview si no existe
+        if not hasattr(self, 'preview_window'):
+            self.crear_ventana_preview()
+        else:
+            self.preview_window.deiconify()
+            self.actualizar_preview()
+
+
+    def crear_ventana_preview(self):
+        """Crea ventana de vista previa acoplable"""
+        self.preview_window = ctk.CTkToplevel(self.root)
+        self.preview_window.title("👁️ Vista Previa del Documento")
+        
+        # Posicionar a la derecha de la ventana principal
+        main_x = self.root.winfo_x()
+        main_y = self.root.winfo_y()
+        main_width = self.root.winfo_width()
+        
+        self.preview_window.geometry(f"400x800+{main_x + main_width + 10}+{main_y}")
+        
+        # Frame principal
+        main_frame = ctk.CTkFrame(self.preview_window)
+        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Header
+        header_frame = ctk.CTkFrame(main_frame, height=50, fg_color="gray25")
+        header_frame.pack(fill="x", pady=(0, 10))
+        header_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            header_frame, text="📄 Vista Previa del Documento",
+            font=ctk.CTkFont(size=16, weight="bold")
+        ).pack(side="left", padx=15, pady=10)
+        
+        # Botón actualizar
+        refresh_btn = ctk.CTkButton(
+            header_frame, text="🔄", width=35, height=35,
+            command=self.actualizar_preview,
+            font=ctk.CTkFont(size=16)
+        )
+        refresh_btn.pack(side="right", padx=15)
+        
+        # Opciones de vista
+        options_frame = ctk.CTkFrame(main_frame, height=40)
+        options_frame.pack(fill="x", pady=(0, 10))
+        options_frame.pack_propagate(False)
+        
+        self.preview_mode = ctk.CTkSegmentedButton(
+            options_frame,
+            values=["📝 Texto", "🎨 Formato", "📊 Estructura"],
+            command=self.cambiar_modo_preview
+        )
+        self.preview_mode.pack(padx=10, pady=5)
+        self.preview_mode.set("📝 Texto")
+        
+        # Área de preview con scroll
+        self.preview_text = ctk.CTkTextbox(
+            main_frame, wrap="word",
+            font=ctk.CTkFont(family="Georgia", size=12),
+            state="disabled"
+        )
+        self.preview_text.pack(fill="both", expand=True)
+        
+        # Actualizar preview inicial
+        self.actualizar_preview()
+        
+        # Configurar para que se actualice automáticamente
+        self.preview_window.protocol("WM_DELETE_WINDOW", self.ocultar_preview)
+
+
+    def actualizar_preview(self):
+        """Actualiza el contenido de la vista previa"""
+        if not hasattr(self, 'preview_window') or not self.preview_window.winfo_exists():
+            return
+        
+        self.preview_text.configure(state="normal")
+        self.preview_text.delete("1.0", "end")
+        
+        modo = self.preview_mode.get()
+        
+        if modo == "📝 Texto":
+            # Vista de texto simple
+            preview_content = self.generar_preview_texto()
+        elif modo == "🎨 Formato":
+            # Vista con formato aplicado
+            preview_content = self.generar_preview_formato()
+        else:
+            # Vista de estructura
+            preview_content = self.generar_preview_estructura()
+        
+        self.preview_text.insert("1.0", preview_content)
+        self.preview_text.configure(state="disabled")
+
+
+    def generar_preview_texto(self):
+        """Genera vista previa en texto plano"""
+        preview = []
+        
+        # Portada
+        preview.append(f"{self.proyecto_data['institucion'].get().upper()}\n")
+        preview.append(f"\"{self.proyecto_data['titulo'].get()}\"\n\n")
+        
+        # Información general
+        for campo in ['estudiantes', 'tutores', 'curso', 'año']:
+            if campo in self.proyecto_data and self.proyecto_data[campo].get():
+                preview.append(f"{campo.title()}: {self.proyecto_data[campo].get()}\n")
+        
+        preview.append("\n" + "="*50 + "\n\n")
+        
+        # Contenido de secciones
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                
+                if seccion['capitulo']:
+                    preview.append(f"\n{seccion['titulo'].upper()}\n")
+                    preview.append("="*30 + "\n\n")
+                elif seccion_id in self.content_texts:
+                    content = self.content_texts[seccion_id].get("1.0", "end").strip()
+                    if content:
+                        preview.append(f"{seccion['titulo'].upper()}\n")
+                        preview.append("-"*20 + "\n")
+                        preview.append(f"{content[:500]}{'...' if len(content) > 500 else ''}\n\n")
+        
+        # Referencias
+        if self.referencias:
+            preview.append("\nREFERENCIAS\n")
+            preview.append("="*30 + "\n")
+            for ref in self.referencias[:5]:
+                preview.append(f"• {ref['autor']} ({ref['año']}). {ref['titulo']}.\n")
+            if len(self.referencias) > 5:
+                preview.append(f"... y {len(self.referencias) - 5} referencias más\n")
+        
+        return ''.join(preview)
+
+
+    def generar_preview_estructura(self):
+        """Genera vista previa de la estructura del documento"""
+        preview = ["ESTRUCTURA DEL DOCUMENTO\n", "="*40 + "\n\n"]
+        
+        # Estadísticas generales
+        total_palabras = sum(
+            len(self.content_texts[sid].get("1.0", "end").split())
+            for sid in self.content_texts if sid in self.secciones_activas
+        )
+        
+        preview.append(f"📊 ESTADÍSTICAS GENERALES:\n")
+        preview.append(f"   • Secciones activas: {len(self.secciones_activas)}\n")
+        preview.append(f"   • Palabras totales: {total_palabras:,}\n")
+        preview.append(f"   • Referencias: {len(self.referencias)}\n")
+        preview.append(f"   • Completitud: {self.calcular_completitud()}%\n\n")
+        
+        preview.append("📋 ESTRUCTURA:\n\n")
+        
+        # Árbol de secciones
+        capitulo_actual = None
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                
+                if seccion['capitulo']:
+                    capitulo_actual = seccion['titulo']
+                    preview.append(f"\n📂 {capitulo_actual}\n")
+                else:
+                    palabras = 0
+                    if seccion_id in self.content_texts:
+                        content = self.content_texts[seccion_id].get("1.0", "end").strip()
+                        palabras = len(content.split()) if content else 0
+                    
+                    estado = "✅" if palabras > 50 else "⚠️" if palabras > 0 else "❌"
+                    requerida = " (REQ)" if seccion.get('requerida', False) else ""
+                    
+                    preview.append(f"   {estado} {seccion['titulo']}{requerida} - {palabras} palabras\n")
+        
+        return ''.join(preview)
+
+
+    def calcular_completitud(self):
+        """Calcula el porcentaje de completitud del proyecto"""
+        secciones_requeridas = 0
+        secciones_completas = 0
+        
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                if seccion.get('requerida', False) and not seccion.get('capitulo', False):
+                    secciones_requeridas += 1
+                    if seccion_id in self.content_texts:
+                        content = self.content_texts[seccion_id].get("1.0", "end").strip()
+                        if len(content) > 50:  # Mínimo 50 caracteres
+                            secciones_completas += 1
+        
+        if secciones_requeridas == 0:
+            return 100
+        
+        return int((secciones_completas / secciones_requeridas) * 100)
+
+    class ToolTip:
+        """Clase para crear tooltips en widgets de CustomTkinter"""
+        def __init__(self, widget, text='tooltip'):
+            self.widget = widget
+            self.text = text
+            self.widget.bind("<Enter>", self.on_enter)
+            self.widget.bind("<Leave>", self.on_leave)
+            self.tooltip = None
+        
+        def on_enter(self, event=None):
+            x, y, _, _ = self.widget.bbox("insert") if hasattr(self.widget, 'bbox') else (0, 0, 0, 0)
+            x += self.widget.winfo_rootx() + 25
+            y += self.widget.winfo_rooty() + 25
+            
+            self.tooltip = ctk.CTkToplevel(self.widget)
+            self.tooltip.wm_overrideredirect(True)
+            self.tooltip.wm_geometry(f"+{x}+{y}")
+            
+            label = ctk.CTkLabel(
+                self.tooltip, text=self.text,
+                fg_color="gray20", corner_radius=6,
+                padx=10, pady=5,
+                font=ctk.CTkFont(size=11)
+            )
+            label.pack()
+        
+        def on_leave(self, event=None):
+            if self.tooltip:
+                self.tooltip.destroy()
+                self.tooltip = None
+
+
+    # Agregar tooltips a los botones principales
+    def agregar_tooltips(self):
+        """Agrega tooltips a todos los elementos importantes"""
+        tooltips = {
+            # Botones principales
+            self.guardar_btn: "Guardar proyecto completo (Ctrl+S)",
+            self.cargar_btn: "Cargar proyecto existente (Ctrl+O)",
+            self.validar_btn: "Validar contenido del proyecto (F5)",
+            self.generar_btn: "Generar documento Word (F9)",
+            
+            # Campos de entrada
+            self.proyecto_data['titulo']: "Título completo de tu investigación o proyecto",
+            self.proyecto_data['estudiantes']: "Nombres separados por comas: Juan Pérez, María García",
+            self.proyecto_data['categoria']: "Selecciona: Ciencia (investigación) o Tecnología (desarrollo)",
+            
+            # Secciones
+            self.agregar_seccion_btn: "Agregar una nueva sección personalizada al documento",
+            self.quitar_seccion_btn: "Eliminar secciones seleccionadas (no se pueden eliminar las requeridas)",
+            self.subir_btn: "Mover la sección seleccionada hacia arriba en el orden",
+            self.bajar_btn: "Mover la sección seleccionada hacia abajo en el orden",
+            
+            # Referencias
+            self.ref_autor: "Formato APA: Apellido, N. o múltiples: García, J. y López, M.",
+            self.ref_año: "Año de publicación (4 dígitos)",
+            self.ref_titulo: "Título completo sin comillas ni cursivas",
+            self.ref_fuente: "Editorial para libros, revista para artículos, URL para web",
+            
+            # Formato
+            self.fuente_texto: "Fuente para el contenido del documento",
+            self.tamaño_texto: "Tamaño en puntos para el texto normal",
+            self.interlineado: "Espacio entre líneas (APA requiere 2.0)",
+            self.margen: "Márgenes en centímetros (APA: 2.54 cm)",
+            
+            # Opciones de generación
+            self.incluir_portada: "Genera página de portada con datos del proyecto",
+            self.incluir_indice: "Incluye índice automático (se actualiza en Word)",
+            self.incluir_agradecimientos: "Agrega página de agradecimientos después de la portada",
+            self.numeracion_paginas: "Numera las páginas del documento"
+        }
+        
+        for widget, texto in tooltips.items():
+            if hasattr(self, widget.__name__):
+                ToolTip(widget, texto)
+
+
+    # Ayuda contextual mejorada
+    def mostrar_ayuda_contextual(self, seccion):
+        """Muestra ayuda específica para cada sección"""
+        ayuda_window = ctk.CTkToplevel(self.root)
+        ayuda_window.title(f"💡 Ayuda - {seccion}")
+        ayuda_window.geometry("600x400")
+        
+        # Contenido de ayuda específico
+        ayudas = {
+            "introduccion": {
+                "titulo": "📝 Cómo escribir una buena introducción",
+                "contenido": """
+    La introducción debe:
+
+    ✓ Presentar el tema de investigación
+    ✓ Explicar el contexto y antecedentes
+    ✓ Mostrar la importancia del estudio
+    ✓ Indicar el alcance del trabajo
+    ✓ Presentar brevemente la estructura
+
+    Extensión recomendada: 1-2 páginas
+    No incluyas: resultados ni conclusiones
+                """
+            },
+            "marco_teorico": {
+                "titulo": "📚 Construyendo el marco teórico",
+                "contenido": """
+    El marco teórico debe:
+
+    ✓ Revisar literatura relevante
+    ✓ Definir conceptos clave
+    ✓ Presentar teorías relacionadas
+    ✓ Mostrar el estado del arte
+    ✓ Usar mínimo 10-15 referencias
+
+    IMPORTANTE: Usa citas en formato [CITA:tipo:autor:año]
+    Ejemplo: [CITA:parafraseo:García:2020]
+                """
+            },
+            "metodologia": {
+                "titulo": "🔬 Describiendo la metodología",
+                "contenido": """
+    La metodología debe incluir:
+
+    ✓ Tipo de investigación
+    ✓ Población y muestra
+    ✓ Instrumentos utilizados
+    ✓ Procedimientos
+    ✓ Análisis de datos
+
+    Sé específico y detallado para permitir replicación
+                """
+            }
+        }
+        
+        info = ayudas.get(seccion, {"titulo": "Ayuda", "contenido": "Información no disponible"})
+        
+        # Frame principal
+        main_frame = ctk.CTkFrame(ayuda_window)
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Título
+        title_label = ctk.CTkLabel(
+            main_frame, text=info["titulo"],
+            font=ctk.CTkFont(size=16, weight="bold")
+        )
+        title_label.pack(pady=(10, 20))
+        
+        # Contenido
+        content_text = ctk.CTkTextbox(
+            main_frame, wrap="word",
+            font=ctk.CTkFont(size=12)
+        )
+        content_text.pack(fill="both", expand=True, pady=(0, 20))
+        content_text.insert("1.0", info["contenido"])
+        content_text.configure(state="disabled")
+        
+        # Botón cerrar
+        close_btn = ctk.CTkButton(
+            main_frame, text="Entendido",
+            command=ayuda_window.destroy
+        )
+        close_btn.pack()
+
+# Mejoras de accesibilidad para ui/main_window.py
+
+# 1. Configuración de tamaños de fuente escalables
+    class FontManager:
+        """Gestor de fuentes para accesibilidad"""
+        def __init__(self):
+            self.base_size = 12
+            self.scale = 1.0
+
+        def get_size(self, tipo="normal"):
+            sizes = {
+                "tiny": int(8 * self.scale),
+                "small": int(10 * self.scale),
+                "normal": int(12 * self.scale),
+                "medium": int(14 * self.scale),
+                "large": int(16 * self.scale),
+                "xlarge": int(20 * self.scale),
+                "title": int(24 * self.scale)
+            }
+            return sizes.get(tipo, self.base_size)
+        
+        def increase_scale(self):
+            if self.scale < 1.5:
+                self.scale += 0.1
+                
+        def decrease_scale(self):
+            if self.scale > 0.7:
+                self.scale -= 0.1
+
+
+    # 2. Detectar tamaño de pantalla y ajustar interfaz
+    def configurar_ventana_responsiva(self):
+        """Configura la ventana según el tamaño de pantalla"""
+        # Obtener dimensiones de pantalla
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calcular tamaño óptimo (80% de la pantalla)
+        window_width = int(screen_width * 0.8)
+        window_height = int(screen_height * 0.8)
+        
+        # Límites mínimos y máximos
+        window_width = max(1000, min(window_width, 1600))
+        window_height = max(600, min(window_height, 900))
+        
+        # Centrar ventana
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Ajustar componentes según tamaño
+        if screen_width < 1366:  # Pantallas pequeñas
+            self.modo_compacto = True
+            self.ajustar_modo_compacto()
+        elif screen_width > 1920:  # Pantallas grandes
+            self.modo_expandido = True
+            self.ajustar_modo_expandido()
+
+
+    # 3. Modo compacto para pantallas pequeñas
+    def ajustar_modo_compacto(self):
+        """Ajusta la interfaz para pantallas pequeñas"""
+        # Reducir padding
+        self.padding_x = 5
+        self.padding_y = 5
+        
+        # Ocultar paneles secundarios por defecto
+        if hasattr(self, 'control_frame'):
+            self.control_frame.configure(width=250)  # Panel lateral más estrecho
+        
+        # Usar fuentes más pequeñas
+        self.font_manager.scale = 0.9
+        
+        # Reducir altura de componentes
+        self.default_entry_height = 30
+        self.default_button_height = 35
+
+
+    # 4. Modo expandido para pantallas grandes
+    def ajustar_modo_expandido(self):
+        """Ajusta la interfaz para pantallas grandes"""
+        # Aumentar padding
+        self.padding_x = 20
+        self.padding_y = 15
+        
+        # Expandir paneles
+        if hasattr(self, 'control_frame'):
+            self.control_frame.configure(width=400)  # Panel lateral más ancho
+        
+        # Usar fuentes más grandes
+        self.font_manager.scale = 1.2
+        
+        # Aumentar altura de componentes
+        self.default_entry_height = 40
+        self.default_button_height = 45
+
+
+    # 5. Atajos de teclado mejorados para accesibilidad
+    def configurar_atajos_accesibilidad(self):
+        """Configura atajos de teclado adicionales para accesibilidad"""
+        # Navegación entre pestañas
+        self.root.bind('<Control-Tab>', self.siguiente_pestaña)
+        self.root.bind('<Control-Shift-Tab>', self.pestaña_anterior)
+        
+        # Zoom de interfaz
+        self.root.bind('<Control-plus>', self.aumentar_zoom)
+        self.root.bind('<Control-minus>', self.disminuir_zoom)
+        self.root.bind('<Control-0>', self.restablecer_zoom)
+        
+        # Navegación entre secciones
+        self.root.bind('<Alt-Up>', lambda e: self.subir_seccion())
+        self.root.bind('<Alt-Down>', lambda e: self.bajar_seccion())
+        
+        # Acceso rápido a funciones
+        self.root.bind('<F1>', lambda e: self.mostrar_instrucciones())
+        self.root.bind('<F2>', lambda e: self.ir_a_seccion_actual())
+        self.root.bind('<F3>', lambda e: self.buscar_en_contenido())
+        self.root.bind('<F4>', lambda e: self.mostrar_preview())
+
+
+    # 6. Función de zoom
+    def aumentar_zoom(self, event=None):
+        """Aumenta el tamaño de la interfaz"""
+        self.font_manager.increase_scale()
+        self.actualizar_tamaños_fuente()
+        
+    def disminuir_zoom(self, event=None):
+        """Disminuye el tamaño de la interfaz"""
+        self.font_manager.decrease_scale()
+        self.actualizar_tamaños_fuente()
+        
+    def restablecer_zoom(self, event=None):
+        """Restablece el tamaño por defecto"""
+        self.font_manager.scale = 1.0
+        self.actualizar_tamaños_fuente()
+
+
+    # 7. Alto contraste para mejor visibilidad
+    def toggle_alto_contraste(self):
+        """Alterna entre modo normal y alto contraste"""
+        if not hasattr(self, 'alto_contraste'):
+            self.alto_contraste = False
+        
+        self.alto_contraste = not self.alto_contraste
+        
+        if self.alto_contraste:
+            # Colores de alto contraste
+            ctk.set_appearance_mode("light")
+            self.colores = {
+                'bg': 'white',
+                'fg': 'black',
+                'button': '#0066CC',
+                'button_hover': '#0052A3',
+                'success': '#008000',
+                'error': '#CC0000',
+                'warning': '#FF8C00'
+            }
+        else:
+            # Colores normales
+            ctk.set_appearance_mode("dark")
+            self.colores = {
+                'bg': 'gray15',
+                'fg': 'white',
+                'button': 'blue',
+                'button_hover': 'darkblue',
+                'success': 'green',
+                'error': 'red',
+                'warning': 'orange'
+            }
+        
+        # Aplicar colores
+        self.aplicar_tema()
+
+
+    # 8. Indicadores visuales mejorados
+    def agregar_indicadores_visuales(self):
+        """Agrega indicadores visuales para mejor feedback"""
+        # Indicador de campo activo
+        def on_focus_in(event):
+            event.widget.configure(border_color="blue", border_width=2)
+        
+        def on_focus_out(event):
+            event.widget.configure(border_color="gray40", border_width=1)
+        
+        # Aplicar a todos los campos de entrada
+        for widget in self.root.winfo_children():
+            if isinstance(widget, (ctk.CTkEntry, ctk.CTkTextbox)):
+                widget.bind("<FocusIn>", on_focus_in)
+                widget.bind("<FocusOut>", on_focus_out)
+
+
+    # 9. Mensajes de estado hablados (para lectores de pantalla)
+    def anunciar_estado(self, mensaje):
+        """Anuncia un mensaje de estado para accesibilidad"""
+        # Crear label temporal para lectores de pantalla
+        if hasattr(self, 'status_announcement'):
+            self.status_announcement.destroy()
+        
+        self.status_announcement = ctk.CTkLabel(
+            self.root, text=mensaje,
+            fg_color="transparent", text_color="transparent"
+        )
+        self.status_announcement.pack()
+        
+        # Eliminar después de 3 segundos
+        self.root.after(3000, lambda: self.status_announcement.destroy() if hasattr(self, 'status_announcement') else None)
