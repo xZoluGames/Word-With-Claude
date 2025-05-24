@@ -231,14 +231,28 @@ class DocumentGenerator:
         
         if app_instance.formato_config['justificado']:
             style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-
-        # Sangria Global Eliminada
-        # if app_instance.formato_config['sangria']:
-            # style.paragraph_format.first_line_indent = Inches(0.5)
         
         style.paragraph_format.space_after = Pt(0)
         
-        # Crear/actualizar estilos de títulos con niveles y COLOR NEGRO
+        # Crear estilo especial para párrafos con sangría
+        try:
+            body_style = doc.styles.add_style('BodyTextIndent', WD_STYLE_TYPE.PARAGRAPH)
+            body_style.base_style = doc.styles['Normal']
+            body_style.font.name = app_instance.formato_config['fuente_texto']
+            body_style.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+            
+            if app_instance.formato_config['sangria']:
+                body_style.paragraph_format.first_line_indent = Inches(0.5)
+        except:
+            if 'BodyTextIndent' in doc.styles:
+                body_style = doc.styles['BodyTextIndent']
+                body_style.font.name = app_instance.formato_config['fuente_texto']
+                body_style.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+                
+                if app_instance.formato_config['sangria']:
+                    body_style.paragraph_format.first_line_indent = Inches(0.5)
+        
+        # IMPORTANTE: Configurar títulos SIN SANGRÍA
         for i in range(1, 7):
             heading_name = f'Heading {i}'
             if heading_name in doc.styles:
@@ -247,26 +261,21 @@ class DocumentGenerator:
                 try:
                     heading_style = doc.styles.add_style(heading_name, WD_STYLE_TYPE.PARAGRAPH)
                 except:
-                    body_style = doc.styles['BodyTextIndent']
-                    
-            body_style.base_style = doc.styles['Normal']
-            body_style.font.name = app_instance.formato_config['fuente_texto']
-            body_style.font.size = Pt(app_instance.formato_config['tamaño_texto'])
-        if app_instance.formato_config['sangria']:
-            body_style.paragraph_format.first_line_indent = Inches(0.5)
-    
+                    continue
+            
             # Configurar estilo del título
             heading_style.font.name = app_instance.formato_config['fuente_titulo']
             heading_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'] - (i-1))
             heading_style.font.bold = True
-            heading_style.font.color.rgb = RGBColor(0, 0, 0)  # NEGRO, no azul
+            heading_style.font.color.rgb = RGBColor(0, 0, 0)
             heading_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
             heading_style.paragraph_format.space_before = Pt(12)
             heading_style.paragraph_format.space_after = Pt(12)
             heading_style.paragraph_format.keep_with_next = True
-            
-            # Configurar nivel de esquema
             heading_style.paragraph_format.outline_level = i - 1
+            
+            # CRÍTICO: Asegurar que los títulos NO tengan sangría
+            heading_style.paragraph_format.first_line_indent = Inches(0)
     
     def crear_portada_profesional(self, doc, app_instance):
         """Crea portada profesional con formato mejorado - SIN duplicar insignia"""
@@ -450,44 +459,55 @@ class DocumentGenerator:
         # Título sin sangría
         p = doc.add_heading('AGRADECIMIENTOS', level=1)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.first_line_indent = Inches(0)  # Sin sangría
         
         doc.add_paragraph()
+        
+        # Párrafo de contenido - CON sangría
         content_p = doc.add_paragraph("(Agregar agradecimientos personalizados aquí)")
         
-
-        self.aplicar_formato_parrafo(p, app_instance, tipo='normal')
+        # Aplicar sangría si está configurada
+        if app_instance.formato_config.get('sangria', True):
+            if 'BodyTextIndent' in doc.styles:
+                content_p.style = doc.styles['BodyTextIndent']
+            else:
+                content_p.paragraph_format.first_line_indent = Inches(0.5)
         
-        content_p.style = doc.styles['Normal']
         doc.add_page_break()
     
     def crear_indice_profesional(self, doc, app_instance):
         """Crea índice profesional con instrucciones"""
-        # Usar estilo Heading 1
+        # Título sin sangría
         p = doc.add_heading('ÍNDICE', level=1)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.first_line_indent = Inches(0)  # Sin sangría
         
         doc.add_paragraph()
         
         instrucciones = """INSTRUCCIONES PARA GENERAR ÍNDICE AUTOMÁTICO:
 
-1. En Word, ir a la pestaña "Referencias"
-2. Hacer clic en "Tabla de contenido"  
-3. Seleccionar el estilo deseado
-4. El índice se generará automáticamente
+    1. En Word, ir a la pestaña "Referencias"
+    2. Hacer clic en "Tabla de contenido"  
+    3. Seleccionar el estilo deseado
+    4. El índice se generará automáticamente
 
-NOTA: Todos los títulos están configurados con niveles de esquema para facilitar la generación automática."""
+    NOTA: Todos los títulos están configurados con niveles de esquema para facilitar la generación automática."""
         
         for linea in instrucciones.split('\n'):
             p = doc.add_paragraph(linea)
-            p.style = doc.styles['Normal']
+            # Sin sangría para instrucciones del índice
+            p.paragraph_format.first_line_indent = Inches(0)
         
         doc.add_paragraph()
         
         # Tabla de ilustraciones
         p = doc.add_heading('TABLA DE ILUSTRACIONES', level=2)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.first_line_indent = Inches(0)  # Sin sangría
         
-        doc.add_paragraph("(Agregar manualmente si hay figuras, tablas o gráficos)")
+        p = doc.add_paragraph("(Agregar manualmente si hay figuras, tablas o gráficos)")
+        p.paragraph_format.first_line_indent = Inches(0)  # Sin sangría
+        
         doc.add_page_break()
     
     def crear_contenido_dinamico_mejorado(self, doc, app_instance):
@@ -508,6 +528,8 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
                     # Agregar como Heading 1
                     p = doc.add_heading(titulo_limpio, level=1)
                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    # ASEGURAR sin sangría
+                    p.paragraph_format.first_line_indent = Inches(0)
                     
                     # Salto de página si no es el primer capítulo
                     if capitulo_num > 1:
@@ -522,13 +544,16 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
                             titulo = seccion['titulo']
                             titulo_limpio = re.sub(r'[^\w\s-]', '', titulo).strip()
                             self.crear_seccion_profesional(doc, titulo_limpio.upper(), 
-                                                         contenido, app_instance, nivel=2)
+                                                        contenido, app_instance, nivel=2)
     
     def crear_seccion_profesional(self, doc, titulo, contenido, app_instance, nivel=1):
         """Crea una sección con nivel de esquema específico y sangría correcta"""
+        
         # Título con nivel de esquema (SIN sangría)
         p = doc.add_heading(titulo, level=nivel)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        # ASEGURAR que el título NO tenga sangría
+        p.paragraph_format.first_line_indent = Inches(0)
         
         # Contenido procesado
         contenido_procesado = self.procesar_citas_mejorado(contenido.strip(), app_instance)
@@ -536,32 +561,43 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
         if contenido_procesado:
             # Dividir en párrafos
             parrafos = contenido_procesado.split('\n\n')
+            
             for i, parrafo in enumerate(parrafos):
                 if parrafo.strip():
+                    # Crear párrafo
                     p = doc.add_paragraph(parrafo.strip())
                     
-                    # CAMBIO IMPORTANTE: Aplicar sangría según normas APA
-                    if app_instance.formato_config.get('sangria', True):
-                        # Detectar si es una cita en bloque (más de 40 palabras o tiene tabulación)
-                        es_cita_bloque = (
-                            len(parrafo.split()) > 40 or 
-                            parrafo.strip().startswith('\t') or
-                            parrafo.strip().startswith('     ')
-                        )
-                        
-                        if es_cita_bloque:
-                            # Citas en bloque: sin sangría primera línea, con margen izquierdo
-                            p.paragraph_format.first_line_indent = Inches(0)
-                            p.paragraph_format.left_indent = Inches(0.5)
-                        else:
-                            # Párrafos normales: con sangría primera línea
-                            p.paragraph_format.first_line_indent = Inches(0.5)
-                            p.style = 'BodyTextIndent' if 'BodyTextIndent' in doc.styles else doc.styles['Normal']
+                    # Detectar tipo de párrafo
+                    es_cita_bloque = (
+                        len(parrafo.split()) > 40 or 
+                        parrafo.strip().startswith('\t') or
+                        parrafo.strip().startswith('     ')
+                    )
+                    
+                    es_lista = any(parrafo.strip().startswith(marca) for marca in ['•', '-', '*', '1.', '2.', '3.', '4.', '5.', '6.', '7.', '8.', '9.'])
+                    
+                    # APLICAR FORMATO SEGÚN TIPO
+                    if es_cita_bloque:
+                        # Citas en bloque: sin sangría primera línea, con margen izquierdo
+                        p.paragraph_format.first_line_indent = Inches(0)
+                        p.paragraph_format.left_indent = Inches(0.5)
+                        p.paragraph_format.right_indent = Inches(0.5)
+                    elif es_lista:
+                        # Listas: sin sangría primera línea
+                        p.paragraph_format.first_line_indent = Inches(0)
+                        p.paragraph_format.left_indent = Inches(0.5)
                     else:
-                        # Sin sangría configurada
-                        p.style = doc.styles['Normal']
+                        # PÁRRAFOS NORMALES: APLICAR SANGRÍA SI ESTÁ CONFIGURADA
+                        if app_instance.formato_config.get('sangria', True):
+                            # CAMBIO CLAVE: Usar el estilo con sangría
+                            if 'BodyTextIndent' in doc.styles:
+                                p.style = doc.styles['BodyTextIndent']
+                            else:
+                                # Si no existe el estilo, aplicar directamente
+                                p.paragraph_format.first_line_indent = Inches(0.5)
         
-        doc.add_paragraph()  # Espaciado
+        # Espaciado después de la sección
+        doc.add_paragraph()
     
     def procesar_citas_mejorado(self, texto, app_instance):
         """Procesa las citas con formato mejorado"""

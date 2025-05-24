@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "fecha_creacion": "2025-05-24T06:22:41.494388",
+  "fecha_creacion": "2025-05-24T07:07:50.868347",
   "informacion_general": {
     "institucion": "COLEGIO PRIVADO DIVINA ESPERANZA",
     "titulo": "Hdsfdsf",
@@ -15,20 +15,20 @@
     "responsable": "Jose,Alex,Maria,Ronaldo, Arturo, Diego, Analia, Marcos, Maria"
   },
   "contenido_secciones": {
-    "resumen": "asdasdadasdad.\nasdasdasdasdas\nasdadasdasdasd\nasdasdasdadadasdaddadasddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n\n\n",
-    "introduccion": "\nasdasdasasdasdasdhasdhasdasgdasgdasgdgadgdgasdasjdgasdgasjdgjdgasjdasgdasjdgadga.\nsdnfhdsgfdshfdshfdshfshsjhhhhhdshgdshs\nasdadadsdasd\nadadasdasd\n\n",
-    "planteamiento": "\n\n\n",
-    "preguntas": "\n\n\n",
-    "delimitaciones": "\n\n\n",
-    "justificacion": "\n\n\n",
-    "objetivos": "\n\n\n",
-    "marco_teorico": "\n\n\n",
-    "metodologia": "\n\n\n",
-    "desarrollo": "\n\n\n",
-    "resultados": "\n\n\n",
-    "analisis_datos": "\n\n\n",
-    "discusion": "\n\n\n",
-    "conclusiones": "\n\n\n"
+    "resumen": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "introduccion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n",
+    "planteamiento": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "preguntas": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "delimitaciones": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n",
+    "justificacion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n",
+    "objetivos": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n",
+    "marco_teorico": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "metodologia": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "desarrollo": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "resultados": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "analisis_datos": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n",
+    "discusion": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n\n",
+    "conclusiones": "Este texto es una prueba de que no funciona la sangria correctamente, :C.\nYo tambien quiero sangria :C.\n\n\n"
   },
   "referencias": [],
   "secciones_activas": [
@@ -190,9 +190,9 @@
     "insignia_personalizada": null
   },
   "estadisticas": {
-    "total_words": 8,
-    "total_chars": 309,
-    "sections_completed": 2,
+    "total_words": 252,
+    "total_chars": 1442,
+    "sections_completed": 14,
     "references_added": 0
   }
 }
