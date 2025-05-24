@@ -231,9 +231,10 @@ class DocumentGenerator:
         
         if app_instance.formato_config['justificado']:
             style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        
-        if app_instance.formato_config['sangria']:
-            style.paragraph_format.first_line_indent = Inches(0.5)
+
+        # Sangria Global Eliminada
+        # if app_instance.formato_config['sangria']:
+            # style.paragraph_format.first_line_indent = Inches(0.5)
         
         style.paragraph_format.space_after = Pt(0)
         
@@ -246,8 +247,14 @@ class DocumentGenerator:
                 try:
                     heading_style = doc.styles.add_style(heading_name, WD_STYLE_TYPE.PARAGRAPH)
                 except:
-                    continue
-            
+                    body_style = doc.styles['BodyTextIndent']
+                    
+            body_style.base_style = doc.styles['Normal']
+            body_style.font.name = app_instance.formato_config['fuente_texto']
+            body_style.font.size = Pt(app_instance.formato_config['tamaño_texto'])
+        if app_instance.formato_config['sangria']:
+            body_style.paragraph_format.first_line_indent = Inches(0.5)
+    
             # Configurar estilo del título
             heading_style.font.name = app_instance.formato_config['fuente_titulo']
             heading_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'] - (i-1))
@@ -271,6 +278,7 @@ class DocumentGenerator:
                 if hasattr(self, 'watermark_manager'):
                     p = doc.add_paragraph()
                     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    p.paragraph_format.first_line_indent = Inches(0)
                     run = p.add_run()
                     # Usar altura específica del logo_config
                     run.add_picture(ruta_insignia, height=self.watermark_manager.logo_config['height'])
@@ -289,16 +297,18 @@ class DocumentGenerator:
         # Institución - CENTRADA
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.first_line_indent = Inches(0)
         run = p.add_run(app_instance.proyecto_data['institucion'].get().upper())
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
-        run.font.size = Pt(16)
+        run.font.size = Pt(18)
         run.font.color.rgb = RGBColor(0, 0, 0)
         
         
         # Título del proyecto - CENTRADO
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.first_line_indent = Inches(0)
         run = p.add_run(f'"{app_instance.proyecto_data["titulo"].get()}"')
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
@@ -436,13 +446,17 @@ class DocumentGenerator:
         personas_run.font.color.rgb = RGBColor(0, 0, 0)
     
     def crear_agradecimientos_profesional(self, doc, app_instance):
-        """Crea página de agradecimientos con formato profesional"""
-        # Usar estilo Heading 1 para el título
+        """Crea página de agradecimientos con formato profesional y sangría"""
+        # Título sin sangría
         p = doc.add_heading('AGRADECIMIENTOS', level=1)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         doc.add_paragraph()
         content_p = doc.add_paragraph("(Agregar agradecimientos personalizados aquí)")
+        
+
+        self.aplicar_formato_parrafo(p, app_instance, tipo='normal')
+        
         content_p.style = doc.styles['Normal']
         doc.add_page_break()
     
@@ -511,8 +525,8 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
                                                          contenido, app_instance, nivel=2)
     
     def crear_seccion_profesional(self, doc, titulo, contenido, app_instance, nivel=1):
-        """Crea una sección con nivel de esquema específico"""
-        # Título con nivel de esquema
+        """Crea una sección con nivel de esquema específico y sangría correcta"""
+        # Título con nivel de esquema (SIN sangría)
         p = doc.add_heading(titulo, level=nivel)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
@@ -522,10 +536,30 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
         if contenido_procesado:
             # Dividir en párrafos
             parrafos = contenido_procesado.split('\n\n')
-            for parrafo in parrafos:
+            for i, parrafo in enumerate(parrafos):
                 if parrafo.strip():
                     p = doc.add_paragraph(parrafo.strip())
-                    p.style = doc.styles['Normal']
+                    
+                    # CAMBIO IMPORTANTE: Aplicar sangría según normas APA
+                    if app_instance.formato_config.get('sangria', True):
+                        # Detectar si es una cita en bloque (más de 40 palabras o tiene tabulación)
+                        es_cita_bloque = (
+                            len(parrafo.split()) > 40 or 
+                            parrafo.strip().startswith('\t') or
+                            parrafo.strip().startswith('     ')
+                        )
+                        
+                        if es_cita_bloque:
+                            # Citas en bloque: sin sangría primera línea, con margen izquierdo
+                            p.paragraph_format.first_line_indent = Inches(0)
+                            p.paragraph_format.left_indent = Inches(0.5)
+                        else:
+                            # Párrafos normales: con sangría primera línea
+                            p.paragraph_format.first_line_indent = Inches(0.5)
+                            p.style = 'BodyTextIndent' if 'BodyTextIndent' in doc.styles else doc.styles['Normal']
+                    else:
+                        # Sin sangría configurada
+                        p.style = doc.styles['Normal']
         
         doc.add_paragraph()  # Espaciado
     
@@ -578,7 +612,7 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
         if not app_instance.referencias:
             return
         
-        # Título como Heading 1
+        # Título sin sangría
         p = doc.add_heading('REFERENCIAS', level=1)
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
@@ -586,18 +620,38 @@ NOTA: Todos los títulos están configurados con niveles de esquema para facilit
         
         # Ordenar referencias alfabéticamente
         referencias_ordenadas = sorted(app_instance.referencias, 
-                                     key=lambda x: x['autor'].split(',')[0].strip())
+                                    key=lambda x: x['autor'].split(',')[0].strip())
         
         for ref in referencias_ordenadas:
             # Formatear según tipo
             ref_text = self._formatear_referencia_apa(ref)
             
             p = doc.add_paragraph(ref_text)
-            # Formato APA: sangría francesa
+            # Formato APA: sangría francesa (NO primera línea)
             p.paragraph_format.first_line_indent = Inches(-0.5)
             p.paragraph_format.left_indent = Inches(0.5)
+            # NO usar el estilo con sangría primera línea
             p.style = doc.styles['Normal']
-    
+    def aplicar_formato_parrafo(self, paragraph, app_instance, tipo='normal'):
+        """Aplica formato de párrafo según el tipo y normas APA"""
+        if tipo == 'portada':
+            # Portada: sin sangría
+            paragraph.paragraph_format.first_line_indent = Inches(0)
+        elif tipo == 'titulo':
+            # Títulos: sin sangría, centrados
+            paragraph.paragraph_format.first_line_indent = Inches(0)
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif tipo == 'cita_bloque':
+            # Citas en bloque: sin sangría primera línea, con margen izquierdo
+            paragraph.paragraph_format.first_line_indent = Inches(0)
+            paragraph.paragraph_format.left_indent = Inches(0.5)
+        elif tipo == 'referencia':
+            # Referencias: sangría francesa
+            paragraph.paragraph_format.first_line_indent = Inches(-0.5)
+            paragraph.paragraph_format.left_indent = Inches(0.5)
+        elif tipo == 'normal' and app_instance.formato_config.get('sangria', True):
+            # Párrafos normales del cuerpo: con sangría primera línea
+            paragraph.paragraph_format.first_line_indent = Inches(0.5)
     def _formatear_referencia_apa(self, ref):
         """Formatea una referencia según el estilo APA"""
         tipo = ref.get('tipo', 'Libro')

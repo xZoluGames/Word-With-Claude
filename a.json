@@ -1,6 +1,6 @@
 {
   "version": "2.0",
-  "fecha_creacion": "2025-05-24T06:04:54.697529",
+  "fecha_creacion": "2025-05-24T06:22:41.494388",
   "informacion_general": {
     "institucion": "COLEGIO PRIVADO DIVINA ESPERANZA",
     "titulo": "Hdsfdsf",
@@ -15,20 +15,20 @@
     "responsable": "Jose,Alex,Maria,Ronaldo, Arturo, Diego, Analia, Marcos, Maria"
   },
   "contenido_secciones": {
-    "resumen": "\n\n",
-    "introduccion": "\n\n",
-    "planteamiento": "\n\n",
-    "preguntas": "\n\n",
-    "delimitaciones": "\n\n",
-    "justificacion": "\n\n",
-    "objetivos": "\n\n",
-    "marco_teorico": "\n\n",
-    "metodologia": "\n\n",
-    "desarrollo": "\n\n",
-    "resultados": "\n\n",
-    "analisis_datos": "\n\n",
-    "discusion": "\n\n",
-    "conclusiones": "\n\n"
+    "resumen": "asdasdadasdad.\nasdasdasdasdas\nasdadasdasdasd\nasdasdasdadadasdaddadasddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n\n\n",
+    "introduccion": "\nasdasdasasdasdasdhasdhasdasgdasgdasgdgadgdgasdasjdgasdgasjdgjdgasjdasgdasjdgadga.\nsdnfhdsgfdshfdshfdshfshsjhhhhhdshgdshs\nasdadadsdasd\nadadasdasd\n\n",
+    "planteamiento": "\n\n\n",
+    "preguntas": "\n\n\n",
+    "delimitaciones": "\n\n\n",
+    "justificacion": "\n\n\n",
+    "objetivos": "\n\n\n",
+    "marco_teorico": "\n\n\n",
+    "metodologia": "\n\n\n",
+    "desarrollo": "\n\n\n",
+    "resultados": "\n\n\n",
+    "analisis_datos": "\n\n\n",
+    "discusion": "\n\n\n",
+    "conclusiones": "\n\n\n"
   },
   "referencias": [],
   "secciones_activas": [
@@ -176,23 +176,23 @@
     }
   },
   "formato_config": {
-    "fuente_texto": "Times New Roman",
+    "fuente_texto": "Calibri",
     "tamaño_texto": 12,
-    "fuente_titulo": "Times New Roman",
+    "fuente_titulo": "Calibri",
     "tamaño_titulo": 14,
     "interlineado": 2.0,
     "margen": 2.54,
-    "justificado": true,
-    "sangria": true
+    "justificado": 1,
+    "sangria": 1
   },
   "imagenes": {
     "encabezado_personalizado": null,
     "insignia_personalizada": null
   },
   "estadisticas": {
-    "total_words": 0,
-    "total_chars": 0,
-    "sections_completed": 0,
+    "total_words": 8,
+    "total_chars": 309,
+    "sections_completed": 2,
     "references_added": 0
   }
 }
