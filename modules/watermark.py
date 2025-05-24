@@ -1,16 +1,14 @@
 """
-Sistema Avanzado de Marcas de Agua para Documentos
-Maneja encabezados como marcas de agua reales detrás del texto
+Sistema Avanzado de Marcas de Agua para Documentos - Versión Corregida
+Compatible con diferentes versiones de python-docx
 """
 
 import os
 from PIL import Image, ImageEnhance
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Cm
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.oxml.xmlchemy import BaseOxmlElement
-from lxml import etree
 import io
 import base64
 
@@ -46,9 +44,23 @@ class WatermarkManager:
                 img = img.resize((width_px, height_px), Image.Resampling.LANCZOS)
             
             # Aplicar transparencia
-            alpha = img.split()[-1]
-            alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
-            img.putalpha(alpha)
+            if img.mode == 'RGBA':
+                # Procesar canal alpha
+                alpha = img.split()[-1]
+                alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
+                img.putalpha(alpha)
+            else:
+                # Si no tiene alpha, crear uno
+                img = img.convert('RGBA')
+                data = img.getdata()
+                newData = []
+                for item in data:
+                    # Cambiar todos los píxeles blancos (o casi blancos) a transparentes
+                    if len(item) == 4:
+                        newData.append((item[0], item[1], item[2], int(item[3] * opacity)))
+                    else:
+                        newData.append((item[0], item[1], item[2], int(255 * opacity)))
+                img.putdata(newData)
             
             # Guardar en memoria
             buffer = io.BytesIO()
@@ -63,181 +75,158 @@ class WatermarkManager:
             return None
     
     def add_watermark_to_section(self, section, image_path, opacity=0.3, stretch=True):
-        """Agrega marca de agua a una sección del documento"""
+        """Agrega marca de agua a una sección del documento - Método alternativo"""
         try:
-            # Procesar imagen
-            if stretch:
-                # Para encabezados, usar ancho de página (típicamente 8.5" - márgenes)
-                processed_image = self.process_image_for_watermark(image_path, opacity, 7.5)
-            else:
-                processed_image = self.process_image_for_watermark(image_path, opacity)
+            # Método simplificado que no usa xpath con namespaces
+            header = section.header
             
-            if not processed_image:
-                return False
+            # Limpiar header existente si es necesario
+            if not header.paragraphs:
+                header.add_paragraph()
             
-            # Crear elemento de marca de agua
-            watermark_element = self._create_watermark_element(processed_image)
+            # Usar el primer párrafo
+            paragraph = header.paragraphs[0]
             
-            # Insertar en el header
-            if hasattr(section, '_sectPr'):
-                # Buscar o crear headerReference
-                header_ref = section._sectPr.xpath('.//w:headerReference[@w:type="default"]', 
-                                                  namespaces={'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'})
+            # Agregar la imagen directamente al header
+            run = paragraph.add_run()
+            
+            # Intentar diferentes métodos según la versión
+            try:
+                # Método 1: Agregar imagen con tamaño específico
+                if stretch:
+                    # Calcular ancho de página menos márgenes (aproximado)
+                    picture = run.add_picture(image_path, width=Inches(7.5))
+                else:
+                    picture = run.add_picture(image_path, width=Inches(5))
                 
-                if not header_ref:
-                    # Crear nuevo header
-                    header = section.header
-                    header_p = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+                # Intentar configurar la imagen como fondo
+                self._configure_as_background(picture, paragraph)
+                
+                return True
+                
+            except Exception as e:
+                print(f"Método 1 falló: {e}")
+                
+                # Método 2: Usar drawing ML directamente
+                try:
+                    return self._add_watermark_alternative(paragraph, image_path, opacity, stretch)
+                except Exception as e2:
+                    print(f"Método 2 también falló: {e2}")
+                    return False
                     
-                    # Agregar marca de agua al párrafo
-                    self._insert_watermark_in_paragraph(header_p, watermark_element)
-                    
-            return True
-            
         except Exception as e:
             print(f"Error agregando marca de agua: {e}")
             return False
     
-    def _create_watermark_element(self, image_data):
-        """Crea el elemento XML para la marca de agua"""
-        # Convertir imagen a base64
-        image_base64 = base64.b64encode(image_data).decode('utf-8')
-        
-        # Crear estructura XML para marca de agua
-        watermark_xml = f"""
-        <w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-             xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">
-            <w:pict>
-                <v:shape xmlns:v="urn:schemas-microsoft-com:vml"
-                         id="PowerPlusWaterMarkObject"
-                         style="position:absolute;left:0;text-align:left;margin-left:0;margin-top:0;width:100%;height:100%;z-index:-251658240"
-                         type="#_x0000_t75">
-                    <v:imagedata src="data:image/png;base64,{image_base64}" />
-                </v:shape>
-            </w:pict>
-        </w:r>
-        """
-        
-        return etree.fromstring(watermark_xml)
-    
-    def _insert_watermark_in_paragraph(self, paragraph, watermark_element):
-        """Inserta la marca de agua en un párrafo"""
-        p_element = paragraph._element
-        p_element.append(watermark_element)
-    
-    def apply_watermark_to_all_sections(self, doc, image_path, config=None):
-        """Aplica marca de agua a todas las secciones del documento"""
-        if config is None:
-            config = {
-                'opacity': 0.3,
-                'stretch': True,
-                'position': 'header'
-            }
-        
-        success_count = 0
-        for section in doc.sections:
-            if self.add_watermark_to_section(section, image_path, 
-                                           config.get('opacity', 0.3),
-                                           config.get('stretch', True)):
-                success_count += 1
-        
-        return success_count == len(doc.sections)
-    
-    def create_header_with_watermark(self, doc, header_image_path, logo_image_path=None):
-        """Crea un encabezado complejo con marca de agua de fondo y logo"""
+    def _configure_as_background(self, picture, paragraph):
+        """Intenta configurar la imagen como fondo"""
         try:
-            for section in doc.sections:
-                header = section.header
+            # Obtener el elemento de imagen
+            if hasattr(picture, '_inline'):
+                inline = picture._inline
                 
-                # Limpiar header existente
-                for paragraph in header.paragraphs:
-                    p = paragraph._element
-                    p.getparent().remove(p)
-                    p._p = p._element = None
+                # Intentar cambiar a anchor (flotante)
+                # Esto permite que el texto fluya sobre la imagen
+                anchor = OxmlElement('wp:anchor')
                 
-                # Crear nuevo párrafo
-                header_para = header.add_paragraph()
+                # Copiar atributos importantes
+                for key, value in [
+                    ('behindDoc', '1'),
+                    ('locked', '0'),
+                    ('layoutInCell', '1'),
+                    ('allowOverlap', '1')
+                ]:
+                    anchor.set(key, value)
                 
-                # Agregar marca de agua de fondo
-                if header_image_path and os.path.exists(header_image_path):
-                    # Procesar como marca de agua con transparencia
-                    self.add_watermark_background(header_para, header_image_path)
+                # Mover elementos del inline al anchor
+                for child in list(inline):
+                    anchor.append(child)
                 
-                # Agregar logo si existe
-                if logo_image_path and os.path.exists(logo_image_path):
-                    self.add_floating_logo(header_para, logo_image_path)
+                # Reemplazar inline con anchor
+                parent = inline.getparent()
+                parent.replace(inline, anchor)
                 
-            return True
-            
         except Exception as e:
-            print(f"Error creando encabezado con marca de agua: {e}")
-            return False
+            # Si falla, al menos la imagen está en el header
+            pass
     
-    def add_watermark_background(self, paragraph, image_path):
-        """Agrega imagen de fondo como marca de agua real"""
+    def _add_watermark_alternative(self, paragraph, image_path, opacity, stretch):
+        """Método alternativo para agregar marca de agua usando XML directo"""
         try:
-            # Obtener dimensiones de página (Letter: 8.5 x 11 pulgadas)
-            page_width_emu = 914400 * 8.5  # EMUs
-            header_height_emu = 914400 * 1.5  # 1.5 pulgadas de alto
+            # Procesar imagen primero
+            if stretch:
+                processed_image = self.process_image_for_watermark(image_path, opacity, 7.5)
+            else:
+                processed_image = self.process_image_for_watermark(image_path, opacity, 5)
             
-            # Crear elemento drawing
-            drawing = OxmlElement('w:drawing')
+            if not processed_image:
+                return False
             
-            # Crear inline
-            inline = OxmlElement('wp:anchor')
-            inline.set('behindDoc', '1')  # Detrás del texto
-            inline.set('locked', '0')
-            inline.set('layoutInCell', '1')
-            inline.set('allowOverlap', '1')
+            # Convertir a base64
+            image_base64 = base64.b64encode(processed_image).decode('utf-8')
             
-            # Posicionamiento
-            inline.set('simplePos', '0')
-            inline.set('relativeHeight', '0')
-            
-            # Posición horizontal
-            pos_h = OxmlElement('wp:positionH')
-            pos_h.set('relativeFrom', 'page')
-            align_h = OxmlElement('wp:align')
-            align_h.text = 'center'
-            pos_h.append(align_h)
-            inline.append(pos_h)
-            
-            # Posición vertical
-            pos_v = OxmlElement('wp:positionV')
-            pos_v.set('relativeFrom', 'page')
-            align_v = OxmlElement('wp:align')
-            align_v.text = 'top'
-            pos_v.append(align_v)
-            inline.append(pos_v)
-            
-            # Extent (tamaño)
-            extent = OxmlElement('wp:extent')
-            extent.set('cx', str(int(page_width_emu)))
-            extent.set('cy', str(int(header_height_emu)))
-            inline.append(extent)
-            
-            # Wrap
-            wrap_none = OxmlElement('wp:wrapNone')
-            inline.append(wrap_none)
-            
-            # Agregar imagen procesada
-            # Aquí iría el código para agregar la imagen con transparencia
-            
-            drawing.append(inline)
-            paragraph._element.append(drawing)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error agregando fondo de marca de agua: {e}")
-            return False
-    
-    def add_floating_logo(self, paragraph, logo_path, position='right'):
-        """Agrega un logo flotante encima de la marca de agua"""
-        try:
+            # Crear elemento run
             run = paragraph.add_run()
-            run.add_picture(logo_path, width=Inches(1.0))
+            r = run._r
+            
+            # Crear estructura pict
+            pict = OxmlElement('w:pict')
+            
+            # Crear shape
+            shape = OxmlElement('v:shape')
+            shape.set('id', '_x0000_i1025')
+            shape.set('type', '#_x0000_t75')
+            shape.set('style', 'width:600pt;height:100pt;position:absolute;z-index:-251658752')
+            
+            # Crear imagedata
+            imagedata = OxmlElement('v:imagedata')
+            imagedata.set(qn('r:id'), 'rId1')
+            imagedata.set('o:title', 'Watermark')
+            
+            # Agregar imagedata a shape
+            shape.append(imagedata)
+            
+            # Agregar shape a pict
+            pict.append(shape)
+            
+            # Agregar pict a run
+            r.append(pict)
+            
+            # Intentar agregar la relación de imagen
+            try:
+                # Este es un método simplificado, puede necesitar ajustes
+                document = paragraph.part
+                image_part = document.new_image_part(image_path)
+                imagedata.set(qn('r:id'), document.relate_to(image_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image'))
+            except:
+                pass
+            
             return True
+            
         except Exception as e:
-            print(f"Error agregando logo: {e}")
+            print(f"Error en método alternativo: {e}")
+            return False
+    
+    def add_simple_header_image(self, section, image_path, width_inches=6.5):
+        """Método simple para agregar imagen al encabezado"""
+        try:
+            header = section.header
+            
+            # Asegurar que hay un párrafo
+            if not header.paragraphs:
+                p = header.add_paragraph()
+            else:
+                p = header.paragraphs[0]
+            
+            # Centrar el párrafo
+            p.alignment = 1  # Center
+            
+            # Agregar la imagen
+            run = p.add_run()
+            picture = run.add_picture(image_path, width=Inches(width_inches))
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error agregando imagen simple al header: {e}")
             return False

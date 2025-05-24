@@ -28,6 +28,7 @@ class DocumentGenerator:
             'justificado': True,
             'sangria': True
         }
+        self.watermark_manager = WatermarkManager()
     
     def generar_documento_async(self, app_instance):
         """Genera el documento profesional en un hilo separado"""
@@ -111,52 +112,62 @@ class DocumentGenerator:
         self.configurar_estilos_profesionales(doc, app_instance)
     
     def configurar_encabezado_marca_agua(self, section, app_instance):
-        """Configura el encabezado como marca de agua detrás del texto"""
+        """Configura el encabezado como marca de agua detrás del texto - Versión Compatible"""
         try:
             # Obtener rutas de imágenes
             ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
             ruta_insignia = self.obtener_ruta_imagen("insignia", app_instance)
             
-            # Usar el nuevo sistema de marcas de agua
             if ruta_encabezado and os.path.exists(ruta_encabezado):
-                # Obtener configuración de marca de agua
-                watermark_config = {
-                    'opacity': getattr(app_instance, 'watermark_opacity', 0.3),
-                    'stretch': getattr(app_instance, 'watermark_stretch', True),
-                    'position': 'header'
-                }
+                # Obtener configuración
+                opacity = getattr(app_instance, 'watermark_opacity', 0.3)
+                stretch = getattr(app_instance, 'watermark_stretch', True)
+                mode = getattr(app_instance, 'watermark_mode', 'watermark')
                 
-                # Aplicar marca de agua
-                self.watermark_manager.add_watermark_to_section(
-                    section, 
-                    ruta_encabezado,
-                    watermark_config['opacity'],
-                    watermark_config['stretch']
-                )
-                
-                # Si hay insignia, agregarla como elemento flotante
-                if ruta_insignia and os.path.exists(ruta_insignia):
+                if mode == 'watermark' and hasattr(self, 'watermark_manager'):
+                    # Intentar aplicar como marca de agua
+                    success = self.watermark_manager.add_watermark_to_section(
+                        section, ruta_encabezado, opacity, stretch
+                    )
+                    
+                    if not success:
+                        # Si falla, usar método simple
+                        self.watermark_manager.add_simple_header_image(
+                            section, ruta_encabezado, 
+                            width_inches=7.5 if stretch else 6.5
+                        )
+                else:
+                    # Modo normal - agregar imagen simple
                     header = section.header
-                    if header.paragraphs:
+                    if not header.paragraphs:
+                        p = header.add_paragraph()
+                    else:
                         p = header.paragraphs[0]
-                        run = p.add_run()
-                        run.add_picture(ruta_insignia, width=Inches(1.0))
+                    
+                    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = p.add_run()
+                    run.add_picture(ruta_encabezado, width=Inches(7.5 if stretch else 6.5))
+                
+                # Agregar insignia si existe
+                if ruta_insignia and os.path.exists(ruta_insignia):
+                    try:
+                        header = section.header
+                        # Crear nuevo párrafo para la insignia
+                        p_logo = header.add_paragraph()
+                        p_logo.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                        run_logo = p_logo.add_run()
+                        run_logo.add_picture(ruta_insignia, width=Inches(1.0))
+                    except Exception as e:
+                        print(f"Error agregando insignia: {e}")
             
             else:
-                # Fallback al método anterior si no hay imagen
-                header = section.header
-                p = header.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = p.add_run(app_instance.proyecto_data.get('institucion', {}).get() or "INSTITUCIÓN EDUCATIVA")
-                run.bold = True
-                run.font.size = Pt(14)
-                run.font.color.rgb = RGBColor(200, 200, 200)
+                # Fallback - encabezado de texto
+                self._configurar_encabezado_simple(section, app_instance)
                 
         except Exception as e:
-            print(f"Error configurando encabezado como marca de agua: {e}")
+            print(f"Error configurando encabezado: {e}")
             # Usar encabezado simple como fallback
             self._configurar_encabezado_simple(section, app_instance)
-
     def configurar_estilos_profesionales(self, doc, app_instance):
         """Configura estilos profesionales del documento"""
         # Estilo normal
