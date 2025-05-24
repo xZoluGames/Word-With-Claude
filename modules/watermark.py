@@ -25,14 +25,14 @@ class WatermarkManager:
             'width': Cm(20.96),
             'height': Cm(27.68),
             'h_align': 'center',      # Centrado horizontalmente
-            'v_position': Cm(-1.5),   # -1.5 cm desde el párrafo
+            'v_position': Cm(-1.16),   # -1.5 cm desde el párrafo
             'behind_text': True       # Detrás del texto
         }
         
         # Configuración de la insignia (solo primera página)
         self.logo_config = {
-            'width': Cm(6.11),
-            'height': Cm(7.45),
+            'width': Cm(4.36),
+            'height': Cm(5.33),
             'align': 'center'  # Centrada
         }
         

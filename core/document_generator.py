@@ -281,42 +281,32 @@ class DocumentGenerator:
                     run = p.add_run()
                     run.add_picture(ruta_insignia, width=Inches(1.5))
                 
-                # Espacio después de la insignia
-                doc.add_paragraph()
                 print("✅ Insignia agregada a la portada")
                 
             except Exception as e:
                 print(f"Error cargando insignia: {e}")
         
-        # Espaciado
-        for _ in range(3):
-            doc.add_paragraph()
-        
-        # Institución
+        # Institución - CENTRADA
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(app_instance.proyecto_data['institucion'].get().upper())
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
         run.font.size = Pt(16)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro
+        run.font.color.rgb = RGBColor(0, 0, 0)
         
-        doc.add_paragraph()
         
-        # Título del proyecto
+        # Título del proyecto - CENTRADO
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         run = p.add_run(f'"{app_instance.proyecto_data["titulo"].get()}"')
         run.bold = True
         run.font.name = app_instance.formato_config['fuente_titulo']
         run.font.size = Pt(18)
-        run.font.color.rgb = RGBColor(0, 0, 0)  # Negro
+        run.font.color.rgb = RGBColor(0, 0, 0)
         
-        # Espaciado
-        for _ in range(3):
-            doc.add_paragraph()
         
-        # Información del proyecto
+        # Información del proyecto - ALINEADO A LA IZQUIERDA
         info_fields = [
             ('ciclo', 'Ciclo'),
             ('curso', 'Curso'), 
@@ -330,72 +320,120 @@ class DocumentGenerator:
         for field, label in info_fields:
             if field in app_instance.proyecto_data and app_instance.proyecto_data[field].get().strip():
                 p = doc.add_paragraph()
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
                 
                 # Etiqueta en negrita
                 label_run = p.add_run(f"{label}: ")
                 label_run.bold = True
                 label_run.font.name = app_instance.formato_config['fuente_texto']
-                label_run.font.size = Pt(12)
+                label_run.font.size = Pt(14)
                 label_run.font.color.rgb = RGBColor(0, 0, 0)
                 
-                # Valor normal
-                value_run = p.add_run(app_instance.proyecto_data[field].get())
+                # 🟢 NUEVO: Procesar valor con formato especial para Responsable
+                valor_original = app_instance.proyecto_data[field].get()
+                
+                if field == 'responsable' and ',' in valor_original:
+                    # Procesar lista de responsables igual que estudiantes/tutores
+                    responsables = [resp.strip() for resp in valor_original.split(',')]
+                    
+                    if len(responsables) == 1:
+                        valor_formateado = responsables[0]
+                    elif len(responsables) == 2:
+                        valor_formateado = f"{responsables[0]} y {responsables[1]}"
+                    else:
+                        todos_menos_ultimo = ", ".join(responsables[:-1])
+                        valor_formateado = f"{todos_menos_ultimo} y {responsables[-1]}"
+                    
+                    value_run = p.add_run(valor_formateado)
+                else:
+                    # Para otros campos, usar el valor tal cual
+                    value_run = p.add_run(valor_original)
+                
                 value_run.font.name = app_instance.formato_config['fuente_texto']
                 value_run.font.size = Pt(12)
                 value_run.font.color.rgb = RGBColor(0, 0, 0)
         
-        # Espaciado
-        doc.add_paragraph()
-        doc.add_paragraph()
         
-        # Estudiantes
+        # Estudiantes - SIN ESPACIOS
         if app_instance.proyecto_data['estudiantes'].get():
             self._agregar_lista_personas(doc, "Estudiantes", 
-                                       app_instance.proyecto_data['estudiantes'].get(), 
-                                       app_instance)
+                                    app_instance.proyecto_data['estudiantes'].get(), 
+                                    app_instance, alineacion='izquierda')
         
-        # Tutores
+        # Tutores - SIN ESPACIOS
         if app_instance.proyecto_data['tutores'].get():
-            doc.add_paragraph()
+            # ❌ ELIMINADO: doc.add_paragraph()
             self._agregar_lista_personas(doc, "Tutores", 
-                                       app_instance.proyecto_data['tutores'].get(), 
-                                       app_instance)
+                                    app_instance.proyecto_data['tutores'].get(), 
+                                    app_instance, alineacion='izquierda')
         
-        # Espaciado final
-        for _ in range(3):
-            doc.add_paragraph()
+        # ❌ ELIMINADO: Espaciado final antes de la fecha
+        # for _ in range(3):
+        #     doc.add_paragraph()
         
-        # Fecha
+        # Fecha - CENTRADA
         p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER  # ✅ AÑO PERMANECE CENTRADO
         year_label = p.add_run("Año: ")
         year_label.bold = True
-        year_label.font.size = Pt(12)
+        year_label.font.name = app_instance.formato_config['fuente_texto']
+        year_label.font.size = Pt(14)
         year_label.font.color.rgb = RGBColor(0, 0, 0)
         
         year_value = p.add_run(str(datetime.now().year))
+        year_value.font.name = app_instance.formato_config['fuente_texto']
         year_value.font.size = Pt(12)
         year_value.font.color.rgb = RGBColor(0, 0, 0)
         
         doc.add_page_break()
-    
-    def _agregar_lista_personas(self, doc, titulo, personas_str, app_instance):
-        """Agrega una lista de personas (estudiantes o tutores) con formato"""
+
+    def _agregar_lista_personas(self, doc, titulo, personas_str, app_instance, alineacion='centro'):
+        """Agrega una lista de personas (estudiantes o tutores) con formato EN UNA SOLA LÍNEA"""
         p = doc.add_paragraph()
-        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        title_run = p.add_run(f"{titulo}:")
+        
+        # Configurar alineación
+        if alineacion == 'izquierda':
+            p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        else:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Título en negrita (Estudiantes: o Tutores:) con ESPACIO después
+        title_run = p.add_run(f"{titulo}: ")  # ← ✅ YA tiene espacio después de ":"
         title_run.bold = True
-        title_run.font.size = Pt(13)
+        title_run.font.name = app_instance.formato_config['fuente_texto']
+        title_run.font.size = Pt(14)
         title_run.font.color.rgb = RGBColor(0, 0, 0)
         
-        personas = personas_str.split(',')
-        for persona in personas:
-            p = doc.add_paragraph()
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run(persona.strip())
-            run.font.size = Pt(12)
-            run.font.color.rgb = RGBColor(0, 0, 0)
+        # 🟢 NUEVO: Procesar y normalizar la lista de personas
+        # Dividir por comas y limpiar espacios de cada nombre
+        personas = []
+        for persona in personas_str.split(','):
+            # Limpiar espacios al inicio y final de cada nombre
+            persona_limpia = persona.strip()
+            if persona_limpia:  # Solo agregar si no está vacío
+                personas.append(persona_limpia)
+        
+        # 🟢 MEJORADO: Formatear la lista con comas y "y"
+        if len(personas) == 0:
+            # No hay personas
+            personas_run = p.add_run("")
+        elif len(personas) == 1:
+            # Solo una persona: "Juan"
+            personas_run = p.add_run(personas[0])
+        elif len(personas) == 2:
+            # Dos personas: "Juan y María"
+            personas_run = p.add_run(f"{personas[0]} y {personas[1]}")
+        else:
+            # Tres o más personas: "Juan, María y Pedro"
+            # Unir todos menos el último con comas y espacio
+            todos_menos_ultimo = ", ".join(personas[:-1])
+            # Agregar " y " antes del último
+            personas_run = p.add_run(f"{todos_menos_ultimo} y {personas[-1]}")
+        
+        # Aplicar formato al texto de las personas
+        personas_run.font.name = app_instance.formato_config['fuente_texto']
+        personas_run.font.size = Pt(12)
+        personas_run.font.color.rgb = RGBColor(0, 0, 0)
     
     def crear_agradecimientos_profesional(self, doc, app_instance):
         """Crea página de agradecimientos con formato profesional"""
