@@ -218,7 +218,8 @@ class DocumentGenerator:
                 except:
                     continue
             heading_style.font.name = app_instance.formato_config['fuente_titulo']
-            heading_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'] - (i-1))
+            heading_style.font.size = Pt(app_instance.formato_config['tamaño_titulo'])
+            heading_style.paragraph_format.page_break_before = True
             heading_style.font.bold = True
             heading_style.font.color.rgb = RGBColor(0, 0, 0)
             heading_style.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER

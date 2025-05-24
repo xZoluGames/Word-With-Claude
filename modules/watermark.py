@@ -22,8 +22,8 @@ class WatermarkManager:
         
         # Configuración del encabezado (páginas 2 en adelante)
         self.header_config = {
-            'width': Cm(20.96),
-            'height': Cm(27.68),
+            'width': Cm(20),
+            'height': Cm(27.75),
             'h_align': 'center',      # Centrado horizontalmente
             'v_position': Cm(-1.16),   # -1.5 cm desde el párrafo
             'behind_text': True       # Detrás del texto
