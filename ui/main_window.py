@@ -17,7 +17,123 @@ from modules.citations import CitationProcessor
 from modules.references import ReferenceManager
 from modules.sections import SectionManager
 from .dialogs import SeccionDialog
+# Agregar AL INICIO de ui/main_window.py, ANTES de la clase ProyectoAcademicoGenerator
 
+# Clase FontManager para gestión de fuentes
+class FontManager:
+
+
+    """Gestor de fuentes para accesibilidad y diseño responsivo"""
+    def __init__(self):
+        self.base_size = 12
+        self.scale = 1.0
+        self.font_cache = {}
+        
+    def get_size(self, tipo="normal"):
+        """Obtiene el tamaño de fuente según el tipo y escala actual"""
+        sizes = {
+            "tiny": int(8 * self.scale),
+            "small": int(10 * self.scale),
+            "normal": int(12 * self.scale),
+            "medium": int(14 * self.scale),
+            "large": int(16 * self.scale),
+            "xlarge": int(20 * self.scale),
+            "title": int(24 * self.scale)
+        }
+        return sizes.get(tipo, self.base_size)
+    
+    def get_font(self, tipo="normal", weight="normal", family=None):
+        """Obtiene una fuente CTk con el tamaño y peso especificados"""
+        size = self.get_size(tipo)
+        cache_key = f"{tipo}_{weight}_{family}_{size}"
+        
+        if cache_key not in self.font_cache:
+            if family is None:
+                family = "Segoe UI" if ctk.get_appearance_mode() == "Light" else "Helvetica"
+            
+            self.font_cache[cache_key] = ctk.CTkFont(
+                family=family,
+                size=size,
+                weight=weight
+            )
+        
+        return self.font_cache[cache_key]
+    
+    def increase_scale(self):
+        """Aumenta la escala de fuentes"""
+        if self.scale < 1.5:
+            self.scale += 0.1
+            self.font_cache.clear()  # Limpiar caché para regenerar fuentes
+            return True
+        return False
+            
+    def decrease_scale(self):
+        """Disminuye la escala de fuentes"""
+        if self.scale > 0.7:
+            self.scale -= 0.1
+            self.font_cache.clear()  # Limpiar caché para regenerar fuentes
+            return True
+        return False
+    
+    def reset_scale(self):
+        """Restablece la escala por defecto"""
+        self.scale = 1.0
+        self.font_cache.clear()
+    
+    def get_current_scale(self):
+        """Obtiene la escala actual"""
+        return self.scale
+
+class ToolTip:
+    """Clase para crear tooltips en widgets de CustomTkinter"""
+    def __init__(self, widget, text='tooltip'):
+        self.widget = widget
+        self.text = text
+        self.widget.bind("<Enter>", self.on_enter)
+        self.widget.bind("<Leave>", self.on_leave)
+        self.tooltip = None
+    
+    def on_enter(self, event=None):
+        """Muestra el tooltip cuando el mouse entra al widget"""
+        x = self.widget.winfo_rootx() + 25
+        y = self.widget.winfo_rooty() + 25
+        
+        # Crear ventana del tooltip
+        self.tooltip = ctk.CTkToplevel(self.widget)
+        self.tooltip.wm_overrideredirect(True)
+        
+        # Posicionar tooltip
+        self.tooltip.wm_geometry(f"+{x}+{y}")
+        
+        # Frame del tooltip con estilo
+        tooltip_frame = ctk.CTkFrame(
+            self.tooltip, 
+            fg_color="gray20", 
+            corner_radius=6,
+            border_width=1,
+            border_color="gray40"
+        )
+        tooltip_frame.pack()
+        
+        # Texto del tooltip
+        label = ctk.CTkLabel(
+            tooltip_frame, 
+            text=self.text,
+            font=ctk.CTkFont(size=11),
+            text_color="white",
+            justify="left",
+            wraplength=300  # Máximo ancho antes de wrap
+        )
+        label.pack(padx=8, pady=5)
+        
+        # Asegurar que el tooltip esté sobre otros widgets
+        self.tooltip.lift()
+    
+    def on_leave(self, event=None):
+        """Oculta el tooltip cuando el mouse sale del widget"""
+        if self.tooltip:
+            self.tooltip.destroy()
+            self.tooltip = None
 class ProyectoAcademicoGenerator:
     def __init__(self):
         self.root = ctk.CTk()
@@ -98,7 +214,278 @@ class ProyectoAcademicoGenerator:
         """Carga el documento base usando template_manager"""
         from template_manager import aplicar_plantilla_tercer_ano
         aplicar_plantilla_tercer_ano(self)
+    # Agregar estos métodos DENTRO de la clase ProyectoAcademicoGenerator
+    # Agregar estos métodos DENTRO de la clase ProyectoAcademicoGenerator
 
+    def configurar_ventana_responsiva(self):
+        """Configura la ventana según el tamaño de pantalla"""
+        # Obtener dimensiones de pantalla
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # Calcular tamaño óptimo (80% de la pantalla)
+        window_width = int(screen_width * 0.8)
+        window_height = int(screen_height * 0.8)
+        
+        # Límites mínimos y máximos
+        window_width = max(1000, min(window_width, 1600))
+        window_height = max(600, min(window_height, 900))
+        
+        # Centrar ventana
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Ajustar componentes según tamaño
+        if screen_width < 1366:  # Pantallas pequeñas
+            self.modo_compacto = True
+            self.ajustar_modo_compacto()
+        elif screen_width > 1920:  # Pantallas grandes
+            self.modo_expandido = True
+            self.ajustar_modo_expandido()
+        else:
+            self.modo_compacto = False
+            self.modo_expandido = False
+
+    def ajustar_modo_compacto(self):
+        """Ajusta la interfaz para pantallas pequeñas"""
+        # Reducir padding
+        self.padding_x = 5
+        self.padding_y = 5
+        
+        # Usar fuentes más pequeñas
+        self.font_manager.scale = 0.9
+        
+        # Configurar tamaños por defecto
+        self.default_entry_height = 30
+        self.default_button_height = 35
+        
+        # Ajustar panel lateral si existe
+        if hasattr(self, 'control_frame'):
+            self.control_frame.configure(width=250)
+
+    def ajustar_modo_expandido(self):
+        """Ajusta la interfaz para pantallas grandes"""
+        # Aumentar padding
+        self.padding_x = 20
+        self.padding_y = 15
+        
+        # Usar fuentes más grandes
+        self.font_manager.scale = 1.1
+        
+        # Configurar tamaños por defecto
+        self.default_entry_height = 40
+        self.default_button_height = 45
+        
+        # Expandir panel lateral si existe
+        if hasattr(self, 'control_frame'):
+            self.control_frame.configure(width=400)
+
+    def configurar_atajos_accesibilidad(self):
+        """Configura atajos de teclado adicionales para accesibilidad"""
+        # Navegación entre pestañas
+        self.root.bind('<Control-Tab>', self.siguiente_pestaña)
+        self.root.bind('<Control-Shift-Tab>', self.pestaña_anterior)
+        
+        # Zoom de interfaz
+        self.root.bind('<Control-plus>', self.aumentar_zoom)
+        self.root.bind('<Control-equal>', self.aumentar_zoom)  # Para teclados sin numpad
+        self.root.bind('<Control-minus>', self.disminuir_zoom)
+        self.root.bind('<Control-0>', self.restablecer_zoom)
+        
+        # Navegación entre secciones
+        self.root.bind('<Alt-Up>', lambda e: self.subir_seccion())
+        self.root.bind('<Alt-Down>', lambda e: self.bajar_seccion())
+        
+        # Acceso rápido a funciones
+        self.root.bind('<F1>', lambda e: self.mostrar_instrucciones())
+        self.root.bind('<F2>', lambda e: self.ir_a_seccion_actual())
+        self.root.bind('<F3>', lambda e: self.buscar_en_contenido())
+        self.root.bind('<F4>', lambda e: self.mostrar_preview() if hasattr(self, 'mostrar_preview') else None)
+        
+        # Guardar rápido
+        self.root.bind('<Control-s>', lambda e: self.guardar_proyecto())
+        self.root.bind('<Control-S>', lambda e: self.guardar_proyecto())
+
+    def anunciar_estado(self, mensaje):
+        """Anuncia un mensaje de estado para accesibilidad"""
+        # Mostrar en la barra de estado si existe
+        if hasattr(self, 'status_label'):
+            self.status_label.configure(text=mensaje)
+        
+        # Crear label temporal para lectores de pantalla
+        if hasattr(self, 'status_announcement'):
+            self.status_announcement.destroy()
+        
+        self.status_announcement = ctk.CTkLabel(
+            self.root, text=mensaje,
+            fg_color="transparent", text_color="transparent",
+            height=1
+        )
+        self.status_announcement.place(x=-100, y=-100)  # Fuera de vista
+        
+        # Eliminar después de 3 segundos
+        self.root.after(3000, lambda: self.status_announcement.destroy() if hasattr(self, 'status_announcement') else None)
+    # Versión optimizada de actualizar_tamaños_fuente()
+
+    def actualizar_tamaños_fuente(self):
+        """Actualiza todos los tamaños de fuente en la interfaz (versión optimizada)"""
+        # Solo actualizar la pestaña visible actual
+        current_tab = self.tabview.get()
+        
+        # Actualizar elementos principales que siempre están visibles
+        if hasattr(self, 'title_label'):
+            self.title_label.configure(font=self.font_manager.get_font("title", "bold"))
+        
+        if hasattr(self, 'stats_label'):
+            self.stats_label.configure(font=self.font_manager.get_font("small"))
+        
+        # Actualizar solo la pestaña activa
+        if current_tab in self.tabview._tab_dict:
+            tab_widget = self.tabview.tab(current_tab)
+            self._actualizar_fuentes_recursivo(tab_widget)
+        
+        # Si estamos en contenido dinámico, actualizar también la sub-pestaña activa
+        if current_tab == "📝 Contenido Dinámico" and hasattr(self, 'content_tabview'):
+            current_content_tab = self.content_tabview.get()
+            if current_content_tab:
+                # Actualizar solo el text widget visible
+                for seccion_id, seccion in self.secciones_disponibles.items():
+                    if seccion['titulo'] == current_content_tab and seccion_id in self.content_texts:
+                        self.content_texts[seccion_id].configure(
+                            font=self.font_manager.get_font("normal", family="Consolas")
+                        )
+                        break
+        
+        # Mostrar escala actual
+        self.anunciar_estado(f"Zoom: {int(self.font_manager.get_current_scale() * 100)}%")
+
+    def _actualizar_fuentes_recursivo(self, widget):
+        """Actualiza fuentes recursivamente en todos los widgets hijos"""
+        # Actualizar el widget actual si tiene configuración de fuente
+        if isinstance(widget, ctk.CTkLabel):
+            # Determinar el tamaño basado en el tamaño actual
+            current_size = widget.cget("font").cget("size") if hasattr(widget.cget("font"), "cget") else 12
+            if current_size >= 20:
+                tipo = "large"
+            elif current_size >= 14:
+                tipo = "medium"
+            elif current_size <= 10:
+                tipo = "small"
+            else:
+                tipo = "normal"
+            
+            # Determinar peso
+            weight = "bold" if hasattr(widget.cget("font"), "cget") and "bold" in str(widget.cget("font")) else "normal"
+            
+            widget.configure(font=self.font_manager.get_font(tipo, weight))
+        
+        elif isinstance(widget, ctk.CTkButton):
+            widget.configure(font=self.font_manager.get_font("normal", "bold"))
+        
+        elif isinstance(widget, ctk.CTkEntry):
+            widget.configure(font=self.font_manager.get_font("normal"))
+        
+        # Recursión en widgets hijos
+        for child in widget.winfo_children():
+            self._actualizar_fuentes_recursivo(child)
+
+
+    def aumentar_zoom(self, event=None):
+        """Aumenta el tamaño de la interfaz (Ctrl +)"""
+        if self.font_manager.increase_scale():
+            self.actualizar_tamaños_fuente()
+            self.actualizar_indicador_zoom()
+            self.anunciar_estado(f"Zoom aumentado a {int(self.font_manager.get_current_scale() * 100)}%")
+        else:
+            messagebox.showinfo("🔍 Zoom", "Zoom máximo alcanzado (150%)")
+
+    def disminuir_zoom(self, event=None):
+        """Disminuye el tamaño de la interfaz (Ctrl -)"""
+        if self.font_manager.decrease_scale():
+            self.actualizar_tamaños_fuente()
+            self.actualizar_indicador_zoom()
+            self.anunciar_estado(f"Zoom reducido a {int(self.font_manager.get_current_scale() * 100)}%")
+        else:
+            messagebox.showinfo("🔍 Zoom", "Zoom mínimo alcanzado (70%)")
+
+    def restablecer_zoom(self, event=None):
+        """Restablece el tamaño por defecto (Ctrl 0)"""
+        self.font_manager.reset_scale()
+        self.actualizar_tamaños_fuente()
+        self.actualizar_indicador_zoom()
+        self.anunciar_estado("Zoom restablecido a 100%")
+
+    def siguiente_pestaña(self, event=None):
+        """Navega a la siguiente pestaña (Ctrl+Tab)"""
+        tabs = list(self.tabview._tab_dict.keys())
+        current = self.tabview.get()
+        try:
+            current_index = tabs.index(current)
+            next_index = (current_index + 1) % len(tabs)
+            self.tabview.set(tabs[next_index])
+            self.anunciar_estado(f"Navegando a: {tabs[next_index]}")
+        except ValueError:
+            pass
+
+    def pestaña_anterior(self, event=None):
+        """Navega a la pestaña anterior (Ctrl+Shift+Tab)"""
+        tabs = list(self.tabview._tab_dict.keys())
+        current = self.tabview.get()
+        try:
+            current_index = tabs.index(current)
+            prev_index = (current_index - 1) % len(tabs)
+            self.tabview.set(tabs[prev_index])
+            self.anunciar_estado(f"Navegando a: {tabs[prev_index]}")
+        except ValueError:
+            pass
+
+    def buscar_en_contenido(self, event=None):
+        """Abre diálogo de búsqueda en el contenido actual (F3)"""
+        # Obtener la pestaña activa
+        current_tab = self.tabview.get()
+        
+        # Si estamos en contenido dinámico, buscar en la sección actual
+        if current_tab == "📝 Contenido Dinámico":
+            # Crear diálogo de búsqueda
+            search_dialog = ctk.CTkInputDialog(
+                text="Buscar en el contenido:",
+                title="🔍 Buscar"
+            )
+            search_term = search_dialog.get_input()
+            
+            if search_term:
+                # Buscar en el text widget activo
+                current_section_tab = self.content_tabview.get() if hasattr(self, 'content_tabview') else None
+                if current_section_tab:
+                    for seccion_id, seccion in self.secciones_disponibles.items():
+                        if seccion['titulo'] == current_section_tab and seccion_id in self.content_texts:
+                            text_widget = self.content_texts[seccion_id]
+                            content = text_widget.get("1.0", "end-1c")
+                            
+                            # Buscar el término
+                            index = content.lower().find(search_term.lower())
+                            if index != -1:
+                                # Calcular posición en el widget
+                                lines_before = content[:index].count('\n')
+                                line_start = content.rfind('\n', 0, index) + 1
+                                column = index - line_start
+                                
+                                # Posicionar cursor
+                                text_widget.mark_set("insert", f"{lines_before + 1}.{column}")
+                                text_widget.see("insert")
+                                text_widget.focus()
+                                
+                                messagebox.showinfo("🔍 Búsqueda", f"Encontrado en línea {lines_before + 1}")
+                            else:
+                                messagebox.showinfo("🔍 Búsqueda", "No se encontró el término")
+                            break
+
+    def ir_a_seccion_actual(self, event=None):
+        """Va directamente al contenido de la sección actual (F2)"""
+        self.tabview.set("📝 Contenido Dinámico")
+        self.anunciar_estado("Navegando a contenido dinámico")
     def gestionar_plantillas(self):
         """Abre el gestor de plantillas avanzado"""
         from template_manager import mostrar_gestor_plantillas
@@ -284,13 +671,13 @@ class ProyectoAcademicoGenerator:
         header_frame.pack(fill="x", padx=10, pady=(10, 5))
         header_frame.pack_propagate(False)
         
-        # Título en header
-        title_label = ctk.CTkLabel(
+        # Título en header - USANDO FONTMANAGER
+        self.title_label = ctk.CTkLabel(
             header_frame, 
             text="🎓 Generador de Proyectos Académicos",
-            font=ctk.CTkFont(size=24, weight="bold")
+            font=self.font_manager.get_font("title", "bold")
         )
-        title_label.pack(pady=(10, 5))
+        self.title_label.pack(pady=(10, 5))
         
         # Botones principales en header
         button_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
@@ -300,38 +687,38 @@ class ProyectoAcademicoGenerator:
         btn_row1 = ctk.CTkFrame(button_frame, fg_color="transparent")
         btn_row1.pack(fill="x", pady=(0, 5))
         
-        help_btn = ctk.CTkButton(
+        self.help_btn = ctk.CTkButton(
             btn_row1, text="📖 Guía", command=self.mostrar_instrucciones,
-            width=80, height=30, font=ctk.CTkFont(size=11, weight="bold")
+            width=80, height=30, font=self.font_manager.get_font("small", "bold")
         )
-        help_btn.pack(side="left", padx=(0, 5))
+        self.help_btn.pack(side="left", padx=(0, 5))
         
-        template_btn = ctk.CTkButton(
+        self.template_btn = ctk.CTkButton(
             btn_row1, text="📋 Plantilla", command=self.cargar_documento_base,
-            width=90, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=90, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="purple", hover_color="darkviolet"
         )
-        template_btn.pack(side="left", padx=(0, 5))
+        self.template_btn.pack(side="left", padx=(0, 5))
         
         # Botones de proyecto
-        save_btn = ctk.CTkButton(
+        self.save_btn = ctk.CTkButton(
             btn_row1, text="💾 Guardar", command=self.guardar_proyecto,
-            width=80, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=80, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="darkgreen", hover_color="green"
         )
-        save_btn.pack(side="left", padx=(0, 5))
+        self.save_btn.pack(side="left", padx=(0, 5))
         
-        load_btn = ctk.CTkButton(
+        self.load_btn = ctk.CTkButton(
             btn_row1, text="📂 Cargar", command=self.cargar_proyecto,
-            width=80, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=80, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="darkblue", hover_color="blue"
         )
-        load_btn.pack(side="left", padx=(0, 5))
+        self.load_btn.pack(side="left", padx=(0, 5))
         
-        # Estadísticas en tiempo real
+        # Estadísticas en tiempo real - USANDO FONTMANAGER
         self.stats_label = ctk.CTkLabel(
             btn_row1, text="📊 Palabras: 0 | Secciones: 0/13 | Referencias: 0",
-            font=ctk.CTkFont(size=10), text_color="gray70"
+            font=self.font_manager.get_font("small"), text_color="gray70"
         )
         self.stats_label.pack(side="right", padx=(5, 0))
         
@@ -340,33 +727,41 @@ class ProyectoAcademicoGenerator:
         btn_row2.pack(fill="x")
         
         # Botones de imágenes
-        images_btn = ctk.CTkButton(
+        self.images_btn = ctk.CTkButton(
             btn_row2, text="🖼️ Imágenes", command=self.gestionar_imagenes,
-            width=90, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=90, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="darkblue", hover_color="navy"
         )
-        images_btn.pack(side="left", padx=(0, 5))
+        self.images_btn.pack(side="left", padx=(0, 5))
         
-        export_btn = ctk.CTkButton(
+        self.export_btn = ctk.CTkButton(
             btn_row2, text="📤 Exportar Config", command=self.exportar_configuracion,
-            width=110, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=110, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="darkorange", hover_color="orange"
         )
-        export_btn.pack(side="left", padx=(0, 5))
+        self.export_btn.pack(side="left", padx=(0, 5))
         
-        validate_btn = ctk.CTkButton(
+        self.validate_btn = ctk.CTkButton(
             btn_row2, text="🔍 Validar", command=self.validar_proyecto,
-            width=80, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=80, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="orange", hover_color="darkorange"
         )
-        validate_btn.pack(side="left", padx=(0, 5))
+        self.validate_btn.pack(side="left", padx=(0, 5))
         
-        generate_btn = ctk.CTkButton(
+        self.generate_btn = ctk.CTkButton(
             btn_row2, text="📄 Generar Documento", command=self.generar_documento_async,
-            width=140, height=30, font=ctk.CTkFont(size=11, weight="bold"),
+            width=140, height=30, font=self.font_manager.get_font("small", "bold"),
             fg_color="green", hover_color="darkgreen"
         )
-        generate_btn.pack(side="right", padx=(5, 0))
+        self.generate_btn.pack(side="right", padx=(5, 0))
+        
+        # Botón de gestión de plantillas
+        self.plantillas_btn = ctk.CTkButton(
+            btn_row2, text="🗂️ Plantillas", command=self.gestionar_plantillas,
+            width=90, height=30, font=self.font_manager.get_font("small", "bold"),
+            fg_color="indigo", hover_color="darkslateblue"
+        )
+        self.plantillas_btn.pack(side="left", padx=(0, 5))
         
         # Frame contenedor para tabs con scroll
         content_container = ctk.CTkFrame(main_container, corner_radius=10)
@@ -376,12 +771,63 @@ class ProyectoAcademicoGenerator:
         self.tabview = ctk.CTkTabview(content_container, width=1100, height=520)
         self.tabview.pack(expand=True, fill="both", padx=10, pady=10)
         
+        # Configurar fuente para las pestañas
+        self.tabview.configure(
+            segmented_button_fg_color="gray25",
+            segmented_button_selected_color="darkblue",
+            segmented_button_selected_hover_color="blue",
+            segmented_button_unselected_color="gray20",
+            segmented_button_unselected_hover_color="gray30"
+        )
+        
         # Crear pestañas
         self.setup_info_general()
         self.setup_contenido_dinamico()
         self.setup_citas_referencias()
         self.setup_formato_avanzado()
         self.setup_generacion()
+        
+        # Agregar menú de accesibilidad en el header
+        accessibility_frame = ctk.CTkFrame(header_frame, fg_color="transparent")
+        accessibility_frame.pack(side="right", padx=20)
+        
+        # Indicador de zoom actual
+        self.zoom_label = ctk.CTkLabel(
+            accessibility_frame, 
+            text=f"🔍 {int(self.font_manager.get_current_scale() * 100)}%",
+            font=self.font_manager.get_font("small")
+        )
+        self.zoom_label.pack(side="left", padx=(0, 10))
+        
+        # Botones de zoom rápido
+        zoom_minus_btn = ctk.CTkButton(
+            accessibility_frame, text="➖", width=30, height=25,
+            command=self.disminuir_zoom,
+            font=self.font_manager.get_font("small", "bold")
+        )
+        zoom_minus_btn.pack(side="left", padx=2)
+        
+        zoom_reset_btn = ctk.CTkButton(
+            accessibility_frame, text="100%", width=45, height=25,
+            command=self.restablecer_zoom,
+            font=self.font_manager.get_font("small")
+        )
+        zoom_reset_btn.pack(side="left", padx=2)
+        
+        zoom_plus_btn = ctk.CTkButton(
+            accessibility_frame, text="➕", width=30, height=25,
+            command=self.aumentar_zoom,
+            font=self.font_manager.get_font("small", "bold")  
+        )
+        zoom_plus_btn.pack(side="left", padx=2)
+        
+        # Agregar tooltips después de crear todos los widgets
+        self.root.after(1000, self.agregar_tooltips)
+        
+        # Actualizar indicador de zoom cuando cambie
+        self.actualizar_indicador_zoom = lambda: self.zoom_label.configure(
+            text=f"🔍 {int(self.font_manager.get_current_scale() * 100)}%"
+        ) if hasattr(self, 'zoom_label') else None
     
     def setup_info_general(self):
         """Pestaña de información general mejorada y más compacta"""
@@ -2692,43 +3138,23 @@ para tu institución y tipo de proyecto.
         """Agrega tooltips a todos los elementos importantes"""
         tooltips = {
             # Botones principales
-            self.guardar_btn: "Guardar proyecto completo (Ctrl+S)",
-            self.cargar_btn: "Cargar proyecto existente (Ctrl+O)",
-            self.validar_btn: "Validar contenido del proyecto (F5)",
-            self.generar_btn: "Generar documento Word (F9)",
+            self.save_btn: "Guardar proyecto completo (Ctrl+S)",
+            self.load_btn: "Cargar proyecto existente (Ctrl+O)",
+            self.validate_btn: "Validar contenido del proyecto (F5)",
+            self.generate_btn: "Generar documento Word (F9)",
+            self.help_btn: "Mostrar guía completa (F1)",
+            self.template_btn: "Cargar plantilla base del colegio",
+            self.images_btn: "Gestionar imágenes del documento",
+            self.export_btn: "Exportar configuración actual",
+            self.plantillas_btn: "Gestionar plantillas avanzadas",
             
-            # Campos de entrada
-            self.proyecto_data['titulo']: "Título completo de tu investigación o proyecto",
-            self.proyecto_data['estudiantes']: "Nombres separados por comas: Juan Pérez, María García",
-            self.proyecto_data['categoria']: "Selecciona: Ciencia (investigación) o Tecnología (desarrollo)",
-            
-            # Secciones
-            self.agregar_seccion_btn: "Agregar una nueva sección personalizada al documento",
-            self.quitar_seccion_btn: "Eliminar secciones seleccionadas (no se pueden eliminar las requeridas)",
-            self.subir_btn: "Mover la sección seleccionada hacia arriba en el orden",
-            self.bajar_btn: "Mover la sección seleccionada hacia abajo en el orden",
-            
-            # Referencias
-            self.ref_autor: "Formato APA: Apellido, N. o múltiples: García, J. y López, M.",
-            self.ref_año: "Año de publicación (4 dígitos)",
-            self.ref_titulo: "Título completo sin comillas ni cursivas",
-            self.ref_fuente: "Editorial para libros, revista para artículos, URL para web",
-            
-            # Formato
-            self.fuente_texto: "Fuente para el contenido del documento",
-            self.tamaño_texto: "Tamaño en puntos para el texto normal",
-            self.interlineado: "Espacio entre líneas (APA requiere 2.0)",
-            self.margen: "Márgenes en centímetros (APA: 2.54 cm)",
-            
-            # Opciones de generación
-            self.incluir_portada: "Genera página de portada con datos del proyecto",
-            self.incluir_indice: "Incluye índice automático (se actualiza en Word)",
-            self.incluir_agradecimientos: "Agrega página de agradecimientos después de la portada",
-            self.numeracion_paginas: "Numera las páginas del documento"
+            # Indicadores
+            self.stats_label: "Estadísticas en tiempo real del proyecto",
+            self.zoom_label: "Nivel de zoom actual - Usa Ctrl+/- para ajustar"
         }
         
         for widget, texto in tooltips.items():
-            if hasattr(self, widget.__name__):
+            if widget and widget.winfo_exists():
                 ToolTip(widget, texto)
 
 
@@ -2816,210 +3242,3 @@ para tu institución y tipo de proyecto.
         )
         close_btn.pack()
 
-# Mejoras de accesibilidad para ui/main_window.py
-
-# 1. Configuración de tamaños de fuente escalables
-    class FontManager:
-        """Gestor de fuentes para accesibilidad"""
-        def __init__(self):
-            self.base_size = 12
-            self.scale = 1.0
-
-        def get_size(self, tipo="normal"):
-            sizes = {
-                "tiny": int(8 * self.scale),
-                "small": int(10 * self.scale),
-                "normal": int(12 * self.scale),
-                "medium": int(14 * self.scale),
-                "large": int(16 * self.scale),
-                "xlarge": int(20 * self.scale),
-                "title": int(24 * self.scale)
-            }
-            return sizes.get(tipo, self.base_size)
-        
-        def increase_scale(self):
-            if self.scale < 1.5:
-                self.scale += 0.1
-                
-        def decrease_scale(self):
-            if self.scale > 0.7:
-                self.scale -= 0.1
-
-
-    # 2. Detectar tamaño de pantalla y ajustar interfaz
-    def configurar_ventana_responsiva(self):
-        """Configura la ventana según el tamaño de pantalla"""
-        # Obtener dimensiones de pantalla
-        screen_width = self.root.winfo_screenwidth()
-        screen_height = self.root.winfo_screenheight()
-        
-        # Calcular tamaño óptimo (80% de la pantalla)
-        window_width = int(screen_width * 0.8)
-        window_height = int(screen_height * 0.8)
-        
-        # Límites mínimos y máximos
-        window_width = max(1000, min(window_width, 1600))
-        window_height = max(600, min(window_height, 900))
-        
-        # Centrar ventana
-        x = (screen_width - window_width) // 2
-        y = (screen_height - window_height) // 2
-        
-        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        
-        # Ajustar componentes según tamaño
-        if screen_width < 1366:  # Pantallas pequeñas
-            self.modo_compacto = True
-            self.ajustar_modo_compacto()
-        elif screen_width > 1920:  # Pantallas grandes
-            self.modo_expandido = True
-            self.ajustar_modo_expandido()
-
-
-    # 3. Modo compacto para pantallas pequeñas
-    def ajustar_modo_compacto(self):
-        """Ajusta la interfaz para pantallas pequeñas"""
-        # Reducir padding
-        self.padding_x = 5
-        self.padding_y = 5
-        
-        # Ocultar paneles secundarios por defecto
-        if hasattr(self, 'control_frame'):
-            self.control_frame.configure(width=250)  # Panel lateral más estrecho
-        
-        # Usar fuentes más pequeñas
-        self.font_manager.scale = 0.9
-        
-        # Reducir altura de componentes
-        self.default_entry_height = 30
-        self.default_button_height = 35
-
-
-    # 4. Modo expandido para pantallas grandes
-    def ajustar_modo_expandido(self):
-        """Ajusta la interfaz para pantallas grandes"""
-        # Aumentar padding
-        self.padding_x = 20
-        self.padding_y = 15
-        
-        # Expandir paneles
-        if hasattr(self, 'control_frame'):
-            self.control_frame.configure(width=400)  # Panel lateral más ancho
-        
-        # Usar fuentes más grandes
-        self.font_manager.scale = 1.2
-        
-        # Aumentar altura de componentes
-        self.default_entry_height = 40
-        self.default_button_height = 45
-
-
-    # 5. Atajos de teclado mejorados para accesibilidad
-    def configurar_atajos_accesibilidad(self):
-        """Configura atajos de teclado adicionales para accesibilidad"""
-        # Navegación entre pestañas
-        self.root.bind('<Control-Tab>', self.siguiente_pestaña)
-        self.root.bind('<Control-Shift-Tab>', self.pestaña_anterior)
-        
-        # Zoom de interfaz
-        self.root.bind('<Control-plus>', self.aumentar_zoom)
-        self.root.bind('<Control-minus>', self.disminuir_zoom)
-        self.root.bind('<Control-0>', self.restablecer_zoom)
-        
-        # Navegación entre secciones
-        self.root.bind('<Alt-Up>', lambda e: self.subir_seccion())
-        self.root.bind('<Alt-Down>', lambda e: self.bajar_seccion())
-        
-        # Acceso rápido a funciones
-        self.root.bind('<F1>', lambda e: self.mostrar_instrucciones())
-        self.root.bind('<F2>', lambda e: self.ir_a_seccion_actual())
-        self.root.bind('<F3>', lambda e: self.buscar_en_contenido())
-        self.root.bind('<F4>', lambda e: self.mostrar_preview())
-
-
-    # 6. Función de zoom
-    def aumentar_zoom(self, event=None):
-        """Aumenta el tamaño de la interfaz"""
-        self.font_manager.increase_scale()
-        self.actualizar_tamaños_fuente()
-        
-    def disminuir_zoom(self, event=None):
-        """Disminuye el tamaño de la interfaz"""
-        self.font_manager.decrease_scale()
-        self.actualizar_tamaños_fuente()
-        
-    def restablecer_zoom(self, event=None):
-        """Restablece el tamaño por defecto"""
-        self.font_manager.scale = 1.0
-        self.actualizar_tamaños_fuente()
-
-
-    # 7. Alto contraste para mejor visibilidad
-    def toggle_alto_contraste(self):
-        """Alterna entre modo normal y alto contraste"""
-        if not hasattr(self, 'alto_contraste'):
-            self.alto_contraste = False
-        
-        self.alto_contraste = not self.alto_contraste
-        
-        if self.alto_contraste:
-            # Colores de alto contraste
-            ctk.set_appearance_mode("light")
-            self.colores = {
-                'bg': 'white',
-                'fg': 'black',
-                'button': '#0066CC',
-                'button_hover': '#0052A3',
-                'success': '#008000',
-                'error': '#CC0000',
-                'warning': '#FF8C00'
-            }
-        else:
-            # Colores normales
-            ctk.set_appearance_mode("dark")
-            self.colores = {
-                'bg': 'gray15',
-                'fg': 'white',
-                'button': 'blue',
-                'button_hover': 'darkblue',
-                'success': 'green',
-                'error': 'red',
-                'warning': 'orange'
-            }
-        
-        # Aplicar colores
-        self.aplicar_tema()
-
-
-    # 8. Indicadores visuales mejorados
-    def agregar_indicadores_visuales(self):
-        """Agrega indicadores visuales para mejor feedback"""
-        # Indicador de campo activo
-        def on_focus_in(event):
-            event.widget.configure(border_color="blue", border_width=2)
-        
-        def on_focus_out(event):
-            event.widget.configure(border_color="gray40", border_width=1)
-        
-        # Aplicar a todos los campos de entrada
-        for widget in self.root.winfo_children():
-            if isinstance(widget, (ctk.CTkEntry, ctk.CTkTextbox)):
-                widget.bind("<FocusIn>", on_focus_in)
-                widget.bind("<FocusOut>", on_focus_out)
-
-
-    # 9. Mensajes de estado hablados (para lectores de pantalla)
-    def anunciar_estado(self, mensaje):
-        """Anuncia un mensaje de estado para accesibilidad"""
-        # Crear label temporal para lectores de pantalla
-        if hasattr(self, 'status_announcement'):
-            self.status_announcement.destroy()
-        
-        self.status_announcement = ctk.CTkLabel(
-            self.root, text=mensaje,
-            fg_color="transparent", text_color="transparent"
-        )
-        self.status_announcement.pack()
-        
-        # Eliminar después de 3 segundos
-        self.root.after(3000, lambda: self.status_announcement.destroy() if hasattr(self, 'status_announcement') else None)
