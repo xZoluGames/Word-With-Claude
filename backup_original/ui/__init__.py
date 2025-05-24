@@ -3,13 +3,12 @@ UI - Interfaz de usuario del generador de proyectos académicos
 """
 
 from .main_window import ProyectoAcademicoGenerator
-from .widgets import FontManager, ToolTip
+from .dialogs import SeccionDialog
 from .components import StatsPanel, FormatPanel
 
 __all__ = [
     'ProyectoAcademicoGenerator',
-    'FontManager',
-    'ToolTip',
+    'SeccionDialog',
     'StatsPanel',
     'FormatPanel'
 ]
