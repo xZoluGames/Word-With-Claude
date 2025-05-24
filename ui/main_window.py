@@ -604,7 +604,1160 @@ class ProyectoAcademicoGenerator:
         """Agrega tooltips a los botones principales"""
         # Implementación pendiente
         pass
-    
+    # Agregar estos métodos a la clase ProyectoAcademicoGenerator en ui/main_window.py
+
+    # ========== MÉTODOS DE INTERFAZ DE USUARIO ==========
+
+    def toggle_sidebar(self):
+        """Alterna la visibilidad del panel lateral"""
+        if hasattr(self, 'sidebar_collapsed') and hasattr(self, 'control_frame'):
+            if self.sidebar_collapsed:
+                # Expandir
+                self.control_frame.pack(side="left", fill="y", padx=(0, 10))
+                self.control_frame.configure(width=320)
+                # Cambiar icono del botón
+                for widget in self.control_frame.winfo_children():
+                    if isinstance(widget, ctk.CTkFrame):
+                        for btn in widget.winfo_children():
+                            if isinstance(btn, ctk.CTkButton) and btn.cget("text") in ["▶", "◀"]:
+                                btn.configure(text="◀")
+                        break
+            else:
+                # Colapsar
+                self.control_frame.pack_forget()
+                # O alternativamente, reducir el ancho
+                # self.control_frame.configure(width=50)
+            
+            self.sidebar_collapsed = not self.sidebar_collapsed
+
+    def filtrar_secciones(self, event=None):
+        """Filtra las secciones según el término de búsqueda"""
+        if hasattr(self, 'search_entry') and hasattr(self, 'secciones_listbox'):
+            termino = self.search_entry.get().lower()
+            
+            # Limpiar lista actual
+            for widget in self.secciones_listbox.winfo_children():
+                widget.destroy()
+            
+            # Mostrar solo secciones que coincidan
+            for seccion_id in self.secciones_activas:
+                if seccion_id in self.secciones_disponibles:
+                    seccion = self.secciones_disponibles[seccion_id]
+                    titulo = seccion['titulo'].lower()
+                    
+                    if termino in titulo or termino in seccion_id:
+                        self._crear_item_seccion(seccion_id, seccion)
+
+    def _crear_item_seccion(self, seccion_id, seccion):
+        """Crea un item visual para la lista de secciones"""
+        if hasattr(self, 'secciones_listbox'):
+            item_frame = ctk.CTkFrame(self.secciones_listbox, fg_color="gray20", corner_radius=5)
+            item_frame.pack(fill="x", padx=5, pady=2)
+            
+            # Checkbox para activar/desactivar
+            var = ctk.BooleanVar(value=True)
+            checkbox = ctk.CTkCheckBox(
+                item_frame, text=seccion['titulo'],
+                variable=var,
+                font=ctk.CTkFont(size=11),
+                command=lambda: self._toggle_seccion(seccion_id, var.get())
+            )
+            checkbox.pack(side="left", padx=10, pady=5)
+            
+            # Indicador si es requerida
+            if seccion.get('requerida', False):
+                req_label = ctk.CTkLabel(
+                    item_frame, text="⚠️",
+                    font=ctk.CTkFont(size=10)
+                )
+                req_label.pack(side="right", padx=10)
+
+    def _toggle_seccion(self, seccion_id, activa):
+        """Activa o desactiva una sección"""
+        if activa and seccion_id not in self.secciones_activas:
+            self.secciones_activas.append(seccion_id)
+        elif not activa and seccion_id in self.secciones_activas:
+            # Verificar si es requerida
+            if self.secciones_disponibles[seccion_id].get('requerida', False):
+                messagebox.showwarning("⚠️ Sección Requerida", 
+                    "Esta sección es requerida y no puede ser desactivada")
+                # Volver a marcar el checkbox
+                return
+            self.secciones_activas.remove(seccion_id)
+        
+        # Actualizar pestañas de contenido
+        self.crear_pestanas_contenido()
+
+    def actualizar_lista_secciones(self):
+        """Actualiza la lista visual de secciones"""
+        if hasattr(self, 'secciones_listbox'):
+            # Limpiar lista actual
+            for widget in self.secciones_listbox.winfo_children():
+                widget.destroy()
+            
+            # Recrear items
+            for seccion_id in self.secciones_activas:
+                if seccion_id in self.secciones_disponibles:
+                    self._crear_item_seccion(seccion_id, self.secciones_disponibles[seccion_id])
+
+    def crear_pestanas_contenido(self):
+        """Crea las pestañas de contenido dinámicamente"""
+        if hasattr(self, 'content_tabview'):
+            # Limpiar pestañas existentes
+            for tab in list(self.content_tabview._tab_dict.keys()):
+                self.content_tabview.delete(tab)
+            
+            # Crear nuevas pestañas según secciones activas
+            for seccion_id in self.secciones_activas:
+                if seccion_id in self.secciones_disponibles:
+                    seccion = self.secciones_disponibles[seccion_id]
+                    
+                    # No crear pestaña para capítulos (solo son títulos)
+                    if not seccion.get('capitulo', False):
+                        tab = self.content_tabview.add(seccion['titulo'])
+                        self._crear_contenido_seccion(tab, seccion_id, seccion)
+            
+            # Actualizar breadcrumb
+            if hasattr(self, 'breadcrumb_label'):
+                current_tab = self.content_tabview.get() if self.content_tabview._tab_dict else ""
+                self.breadcrumb_label.configure(text=f"📍 Navegación: {current_tab}")
+
+    def _crear_contenido_seccion(self, parent, seccion_id, seccion):
+        """Crea el contenido para una sección"""
+        # Frame contenedor
+        section_frame = ctk.CTkFrame(parent, corner_radius=10)
+        section_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Header con instrucción
+        header_frame = ctk.CTkFrame(section_frame, fg_color="gray25", height=60)
+        header_frame.pack(fill="x", padx=10, pady=(10, 5))
+        header_frame.pack_propagate(False)
+        
+        instruc_label = ctk.CTkLabel(
+            header_frame, text=f"💡 {seccion['instruccion']}",
+            font=ctk.CTkFont(size=12),
+            wraplength=700, justify="left"
+        )
+        instruc_label.pack(padx=15, pady=10)
+        
+        # Área de texto
+        text_widget = ctk.CTkTextbox(
+            section_frame,
+            font=ctk.CTkFont(size=12, family="Georgia"),
+            wrap="word"
+        )
+        text_widget.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+        
+        # Guardar referencia al widget de texto
+        self.content_texts[seccion_id] = text_widget
+        
+        # Si ya hay contenido guardado, restaurarlo
+        if hasattr(self, 'contenido_guardado') and seccion_id in self.contenido_guardado:
+            text_widget.insert("1.0", self.contenido_guardado[seccion_id])
+        
+        # Barra de herramientas
+        self._crear_toolbar_seccion(section_frame, seccion_id, text_widget)
+
+    def _crear_toolbar_seccion(self, parent, seccion_id, text_widget):
+        """Crea la barra de herramientas para una sección"""
+        toolbar = ctk.CTkFrame(parent, height=40, fg_color="gray20")
+        toolbar.pack(fill="x", padx=10, pady=(0, 10))
+        
+        # Botón insertar cita
+        if seccion_id in ['marco_teorico', 'introduccion', 'desarrollo', 'discusion']:
+            cita_btn = ctk.CTkButton(
+                toolbar, text="📚 Insertar Cita",
+                command=lambda: self.insertar_cita_dialog(text_widget, seccion_id),
+                width=120, height=30
+            )
+            cita_btn.pack(side="left", padx=5, pady=5)
+        
+        # Contador de palabras
+        word_count = ctk.CTkLabel(
+            toolbar, text="Palabras: 0",
+            font=ctk.CTkFont(size=11)
+        )
+        word_count.pack(side="right", padx=10)
+        
+        # Actualizar contador al escribir
+        def update_count(event=None):
+            content = text_widget.get("1.0", "end-1c")
+            words = len(content.split())
+            word_count.configure(text=f"Palabras: {words}")
+        
+        text_widget.bind("<KeyRelease>", update_count)
+
+    def insertar_cita_dialog(self, text_widget, seccion_tipo):
+        """Abre el diálogo para insertar citas"""
+        from .dialogs import CitationDialog
+        
+        dialog = CitationDialog(self.root, seccion_tipo)
+        self.root.wait_window(dialog.dialog)
+        
+        if dialog.result:
+            # Insertar la cita en la posición del cursor
+            text_widget.insert("insert", dialog.result + " ")
+
+    # ========== MÉTODOS DE GESTIÓN DE SECCIONES ==========
+
+    def quitar_seccion(self):
+        """Quita la sección seleccionada"""
+        # Por ahora, quitar la última sección no requerida
+        for i in range(len(self.secciones_activas) - 1, -1, -1):
+            seccion_id = self.secciones_activas[i]
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                if not seccion.get('requerida', False) and not seccion.get('capitulo', False):
+                    self.secciones_activas.pop(i)
+                    self.actualizar_lista_secciones()
+                    self.crear_pestanas_contenido()
+                    messagebox.showinfo("✅ Eliminada", f"Sección '{seccion['titulo']}' eliminada")
+                    return
+        
+        messagebox.showwarning("⚠️ Sin secciones", "No hay secciones que se puedan eliminar")
+
+    def editar_seccion(self):
+        """Edita una sección existente"""
+        # Obtener la sección actual
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección por el título
+            seccion_id = None
+            for sid, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    seccion_id = sid
+                    break
+            
+            if seccion_id:
+                from .dialogs import SeccionDialog
+                
+                dialog = SeccionDialog(
+                    self.root, 
+                    self.secciones_disponibles,
+                    editar=True,
+                    seccion_actual=(seccion_id, self.secciones_disponibles[seccion_id])
+                )
+                
+                self.root.wait_window(dialog.dialog)
+                
+                if dialog.result:
+                    _, seccion_data = dialog.result
+                    self.secciones_disponibles[seccion_id].update(seccion_data)
+                    self.actualizar_lista_secciones()
+                    self.crear_pestanas_contenido()
+                    messagebox.showinfo("✅ Actualizada", "Sección actualizada correctamente")
+
+    def subir_seccion(self):
+        """Sube la sección actual en el orden"""
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección
+            for seccion_id, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    if seccion_id in self.secciones_activas:
+                        index = self.secciones_activas.index(seccion_id)
+                        if index > 0:
+                            # Intercambiar con la anterior
+                            self.secciones_activas[index], self.secciones_activas[index-1] = \
+                                self.secciones_activas[index-1], self.secciones_activas[index]
+                            self.actualizar_lista_secciones()
+                            self.crear_pestanas_contenido()
+                            # Mantener la pestaña actual seleccionada
+                            self.content_tabview.set(current_tab)
+                    break
+
+    def bajar_seccion(self):
+        """Baja la sección actual en el orden"""
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección
+            for seccion_id, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    if seccion_id in self.secciones_activas:
+                        index = self.secciones_activas.index(seccion_id)
+                        if index < len(self.secciones_activas) - 1:
+                            # Intercambiar con la siguiente
+                            self.secciones_activas[index], self.secciones_activas[index+1] = \
+                                self.secciones_activas[index+1], self.secciones_activas[index]
+                            self.actualizar_lista_secciones()
+                            self.crear_pestanas_contenido()
+                            # Mantener la pestaña actual seleccionada
+                            self.content_tabview.set(current_tab)
+                    break
+
+    # ========== MÉTODOS DE REFERENCIAS ==========
+
+    def agregar_referencia(self):
+        """Agrega una referencia bibliográfica"""
+        # Recopilar datos del formulario
+        if all([
+            hasattr(self, 'ref_tipo'),
+            hasattr(self, 'ref_autor'),
+            hasattr(self, 'ref_año'),
+            hasattr(self, 'ref_titulo'),
+            hasattr(self, 'ref_fuente')
+        ]):
+            ref_data = {
+                'tipo': self.ref_tipo.get(),
+                'autor': self.ref_autor.get().strip(),
+                'año': self.ref_año.get().strip(),
+                'titulo': self.ref_titulo.get().strip(),
+                'fuente': self.ref_fuente.get().strip()
+            }
+            
+            # Validar campos requeridos
+            if not all([ref_data['autor'], ref_data['año'], ref_data['titulo']]):
+                messagebox.showerror("❌ Error", "Complete todos los campos obligatorios")
+                return
+            
+            # Validar formato del año
+            try:
+                año = int(ref_data['año'])
+                if año < 1900 or año > 2050:
+                    raise ValueError()
+            except:
+                messagebox.showerror("❌ Error", "El año debe ser un número válido entre 1900 y 2050")
+                return
+            
+            # Agregar a la lista
+            self.referencias.append(ref_data)
+            
+            # Actualizar lista visual
+            self.actualizar_lista_referencias()
+            
+            # Limpiar campos
+            self.ref_autor.delete(0, "end")
+            self.ref_año.delete(0, "end")
+            self.ref_titulo.delete(0, "end")
+            self.ref_fuente.delete(0, "end")
+            
+            # Actualizar contador
+            if hasattr(self, 'ref_stats_label'):
+                self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+            
+            messagebox.showinfo("✅ Agregada", "Referencia agregada correctamente")
+
+    def actualizar_lista_referencias(self):
+        """Actualiza la lista visual de referencias"""
+        if hasattr(self, 'ref_scroll_frame'):
+            # Limpiar lista actual
+            for widget in self.ref_scroll_frame.winfo_children():
+                widget.destroy()
+            
+            # Mostrar referencias
+            for i, ref in enumerate(self.referencias):
+                ref_item_frame = ctk.CTkFrame(self.ref_scroll_frame, fg_color="gray20", corner_radius=8)
+                ref_item_frame.pack(fill="x", padx=5, pady=5)
+                
+                # Formatear referencia APA
+                if ref['tipo'] == 'Libro':
+                    apa_ref = f"{ref['autor']} ({ref['año']}). {ref['titulo']}. {ref['fuente']}."
+                elif ref['tipo'] == 'Web':
+                    apa_ref = f"{ref['autor']} ({ref['año']}). {ref['titulo']}. Recuperado de {ref['fuente']}"
+                else:
+                    apa_ref = f"{ref['autor']} ({ref['año']}). {ref['titulo']}. {ref['fuente']}."
+                
+                ref_label = ctk.CTkLabel(
+                    ref_item_frame, text=f"📖 {apa_ref}", 
+                    font=ctk.CTkFont(size=11),
+                    wraplength=800, justify="left"
+                )
+                ref_label.pack(padx=15, pady=10, anchor="w")
+                
+                # Botón eliminar individual
+                delete_btn = ctk.CTkButton(
+                    ref_item_frame, text="🗑️", width=30, height=30,
+                    command=lambda idx=i: self.eliminar_referencia_individual(idx),
+                    fg_color="red", hover_color="darkred"
+                )
+                delete_btn.pack(side="right", padx=10)
+
+    def eliminar_referencia_individual(self, index):
+        """Elimina una referencia específica"""
+        if 0 <= index < len(self.referencias):
+            ref = self.referencias[index]
+            respuesta = messagebox.askyesno("🗑️ Confirmar", 
+                f"¿Eliminar esta referencia?\n\n{ref['autor']} ({ref['año']})")
+            
+            if respuesta:
+                self.referencias.pop(index)
+                self.actualizar_lista_referencias()
+                
+                # Actualizar contador
+                if hasattr(self, 'ref_stats_label'):
+                    self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+
+    def actualizar_campos_referencia(self, tipo_seleccionado):
+        """Actualiza los campos del formulario según el tipo de referencia"""
+        if hasattr(self, 'fuente_label'):
+            # Cambiar etiqueta según tipo
+            if tipo_seleccionado == "Libro":
+                self.fuente_label.configure(text="Editorial:")
+                self.ref_fuente.configure(placeholder_text="Nombre de la editorial")
+            elif tipo_seleccionado == "Artículo":
+                self.fuente_label.configure(text="Revista:")
+                self.ref_fuente.configure(placeholder_text="Nombre de la revista, volumen(número), páginas")
+            elif tipo_seleccionado == "Web":
+                self.fuente_label.configure(text="URL:")
+                self.ref_fuente.configure(placeholder_text="https://www.ejemplo.com")
+            elif tipo_seleccionado == "Tesis":
+                self.fuente_label.configure(text="Universidad:")
+                self.ref_fuente.configure(placeholder_text="Universidad, tipo de tesis")
+            elif tipo_seleccionado == "Conferencia":
+                self.fuente_label.configure(text="Evento:")
+                self.ref_fuente.configure(placeholder_text="Nombre del evento, lugar")
+            elif tipo_seleccionado == "Informe":
+                self.fuente_label.configure(text="Organización:")
+                self.ref_fuente.configure(placeholder_text="Organización que publica")
+
+    # ========== MÉTODOS DE VISTA PREVIA ==========
+
+    def actualizar_preview(self):
+        """Actualiza el contenido de la vista previa"""
+        if hasattr(self, 'preview_text') and hasattr(self, 'preview_mode'):
+            modo = self.preview_mode.get() if hasattr(self.preview_mode, 'get') else "📝 Texto"
+            
+            self.preview_text.configure(state="normal")
+            self.preview_text.delete("1.0", "end")
+            
+            if modo == "📝 Texto":
+                # Vista previa del texto compilado
+                preview_content = self.generar_preview_texto()
+            elif modo == "🎨 Formato":
+                # Vista previa con formato aplicado
+                preview_content = self.generar_preview_formato()
+            elif modo == "📊 Estructura":
+                # Vista previa de la estructura
+                preview_content = self.generar_preview_estructura()
+            else:
+                preview_content = "Modo de vista previa no reconocido"
+            
+            self.preview_text.insert("1.0", preview_content)
+            self.preview_text.configure(state="disabled")
+
+    def generar_preview_texto(self):
+        """Genera vista previa del texto compilado"""
+        preview = []
+        
+        # Título
+        if 'titulo' in self.proyecto_data:
+            titulo = self.proyecto_data['titulo'].get()
+            if titulo:
+                preview.append(f"{titulo.upper()}\n")
+                preview.append("="*len(titulo) + "\n\n")
+        
+        # Compilar secciones
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles and seccion_id in self.content_texts:
+                seccion = self.secciones_disponibles[seccion_id]
+                contenido = self.content_texts[seccion_id].get("1.0", "end").strip()
+                
+                if contenido:
+                    # Agregar título de sección
+                    titulo_seccion = seccion['titulo'].replace('📄', '').replace('🔍', '').replace('📖', '').strip()
+                    preview.append(f"\n{titulo_seccion.upper()}\n")
+                    preview.append("-"*len(titulo_seccion) + "\n\n")
+                    
+                    # Agregar contenido
+                    preview.append(contenido + "\n")
+        
+        # Referencias
+        if self.referencias:
+            preview.append("\n\nREFERENCIAS\n")
+            preview.append("-"*11 + "\n\n")
+            
+            for ref in sorted(self.referencias, key=lambda x: x['autor']):
+                if ref['tipo'] == 'Libro':
+                    preview.append(f"{ref['autor']} ({ref['año']}). {ref['titulo']}. {ref['fuente']}.\n\n")
+                else:
+                    preview.append(f"{ref['autor']} ({ref['año']}). {ref['titulo']}. {ref['fuente']}.\n\n")
+        
+        return ''.join(preview) if preview else "No hay contenido para mostrar"
+
+    def generar_preview_estructura(self):
+        """Genera vista previa de la estructura del documento"""
+        preview = []
+        preview.append("📊 ESTRUCTURA DEL DOCUMENTO\n")
+        preview.append("="*30 + "\n\n")
+        
+        # Información general
+        preview.append("📋 INFORMACIÓN GENERAL:\n")
+        campos_info = ['institucion', 'titulo', 'estudiantes', 'tutores']
+        for campo in campos_info:
+            if campo in self.proyecto_data:
+                valor = self.proyecto_data[campo].get()
+                if valor:
+                    preview.append(f"   • {campo.title()}: {valor}\n")
+        
+        preview.append("\n📑 SECCIONES ACTIVAS:\n")
+        
+        # Estructura de secciones
+        num_capitulo = 0
+        for i, seccion_id in enumerate(self.secciones_activas, 1):
+            if seccion_id in self.secciones_disponibles:
+                seccion = self.secciones_disponibles[seccion_id]
+                
+                if seccion.get('capitulo', False):
+                    num_capitulo += 1
+                    preview.append(f"\n{seccion['titulo']}\n")
+                else:
+                    # Contar palabras si existe contenido
+                    palabras = 0
+                    if seccion_id in self.content_texts:
+                        contenido = self.content_texts[seccion_id].get("1.0", "end").strip()
+                        if contenido:
+                            palabras = len(contenido.split())
+                    
+                    estado = "✅" if palabras > 50 else "⚠️" if palabras > 0 else "❌"
+                    preview.append(f"   {estado} {seccion['titulo']} ({palabras} palabras)\n")
+        
+        # Estadísticas
+        preview.append(f"\n📈 ESTADÍSTICAS:\n")
+        preview.append(f"   • Total de secciones: {len([s for s in self.secciones_activas if not self.secciones_disponibles.get(s, {}).get('capitulo', False)])}\n")
+        preview.append(f"   • Referencias agregadas: {len(self.referencias)}\n")
+        preview.append(f"   • Palabras totales: {self.stats.get('total_words', 0)}\n")
+        
+        return ''.join(preview)
+
+    # ========== MÉTODOS DE VALIDACIÓN ==========
+
+    def mostrar_bienvenida_validacion(self):
+        """Muestra mensaje de bienvenida en el panel de validación"""
+        if hasattr(self, 'validation_text'):
+            mensaje = """🎯 PANEL DE VALIDACIÓN Y GENERACIÓN
+
+    Este panel te ayudará a:
+    • Validar que tu proyecto esté completo
+    • Ver estadísticas y análisis
+    • Revisar logs del sistema
+    • Obtener sugerencias de mejora
+
+    Presiona '🔍 Validar' en el header principal para comenzar la validación.
+
+    OPCIONES DE GENERACIÓN:
+    ✓ Incluir Portada - Página de presentación profesional
+    ✓ Incluir Índice - Tabla de contenidos automática
+    ✓ Incluir Agradecimientos - Sección de agradecimientos
+    ✓ Numeración de páginas - Números de página automáticos
+
+    Cuando todo esté listo, presiona '📄 Generar Documento' para crear tu archivo Word.
+    """
+            self.validation_text.insert("1.0", mensaje)
+
+    def cambiar_tab_validacion(self, valor):
+        """Cambia el contenido según la pestaña de validación seleccionada"""
+        if hasattr(self, 'validation_text'):
+            self.validation_text.delete("1.0", "end")
+            
+            if valor == "🔍 Validación":
+                self.validar_proyecto()
+            elif valor == "📋 Logs":
+                self.mostrar_logs()
+            elif valor == "📊 Estadísticas":
+                self.mostrar_estadisticas()
+            elif valor == "💡 Sugerencias":
+                self.mostrar_sugerencias()
+
+    def mostrar_estadisticas(self):
+        """Muestra estadísticas detalladas del proyecto"""
+        stats = []
+        stats.append("📊 ESTADÍSTICAS DETALLADAS DEL PROYECTO\n")
+        stats.append("="*50 + "\n\n")
+        
+        # Estadísticas generales
+        stats.append("📈 MÉTRICAS GENERALES:\n")
+        stats.append(f"   • Palabras totales: {self.stats.get('total_words', 0):,}\n")
+        stats.append(f"   • Caracteres totales: {self.stats.get('total_chars', 0):,}\n")
+        stats.append(f"   • Promedio palabras/sección: {self.stats.get('total_words', 0) // max(1, self.stats.get('sections_completed', 1))}\n\n")
+        
+        # Por sección
+        stats.append("📑 ANÁLISIS POR SECCIÓN:\n")
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles and seccion_id in self.content_texts:
+                seccion = self.secciones_disponibles[seccion_id]
+                if not seccion.get('capitulo', False):
+                    contenido = self.content_texts[seccion_id].get("1.0", "end").strip()
+                    palabras = len(contenido.split()) if contenido else 0
+                    caracteres = len(contenido) if contenido else 0
+                    
+                    stats.append(f"\n   {seccion['titulo']}:\n")
+                    stats.append(f"      - Palabras: {palabras:,}\n")
+                    stats.append(f"      - Caracteres: {caracteres:,}\n")
+                    stats.append(f"      - Estado: {'✅ Completo' if palabras > 50 else '⚠️ En progreso' if palabras > 0 else '❌ Vacío'}\n")
+        
+        # Referencias
+        stats.append(f"\n📚 REFERENCIAS:\n")
+        stats.append(f"   • Total: {len(self.referencias)}\n")
+        
+        if self.referencias:
+            tipos_ref = {}
+            for ref in self.referencias:
+                tipo = ref.get('tipo', 'Otro')
+                tipos_ref[tipo] = tipos_ref.get(tipo, 0) + 1
+            
+            for tipo, cantidad in tipos_ref.items():
+                stats.append(f"   • {tipo}: {cantidad}\n")
+        
+        self.validation_text.insert("1.0", ''.join(stats))
+
+    # ========== MÉTODOS DE IMÁGENES ==========
+
+    def cargar_imagen_personalizada(self, tipo, parent_window=None):
+        """Carga una imagen personalizada (encabezado o insignia)"""
+        from tkinter import filedialog
+        from PIL import Image
+        
+        filename = filedialog.askopenfilename(
+            title=f"Seleccionar {tipo}",
+            filetypes=[("Imágenes", "*.png *.jpg *.jpeg"), ("PNG", "*.png"), ("JPEG", "*.jpg *.jpeg")],
+            parent=parent_window
+        )
+        
+        if filename:
+            try:
+                # Verificar que es una imagen válida
+                img = Image.open(filename)
+                
+                # Redimensionar si es necesario
+                if tipo == "encabezado":
+                    # Recomendado: 600x100 px
+                    if img.width > 800 or img.height > 150:
+                        img.thumbnail((800, 150), Image.Resampling.LANCZOS)
+                    self.encabezado_personalizado = filename
+                    
+                    # Actualizar estado en el diálogo
+                    if hasattr(self, 'enc_custom_label'):
+                        self.enc_custom_label.configure(text="Encabezado: ✅ Cargado")
+                        
+                elif tipo == "insignia":
+                    # Recomendado: 100x100 px
+                    if img.width > 150 or img.height > 150:
+                        img.thumbnail((150, 150), Image.Resampling.LANCZOS)
+                    self.insignia_personalizada = filename
+                    
+                    # Actualizar estado en el diálogo
+                    if hasattr(self, 'ins_custom_label'):
+                        self.ins_custom_label.configure(text="Insignia: ✅ Cargado")
+                
+                messagebox.showinfo("✅ Cargado", 
+                    f"{tipo.title()} cargado correctamente:\n{os.path.basename(filename)}")
+                    
+            except Exception as e:
+                messagebox.showerror("❌ Error", f"Error al cargar imagen:\n{str(e)}")
+
+    def restablecer_imagenes(self, parent_window=None):
+        """Restablece las imágenes a las predeterminadas"""
+        respuesta = messagebox.askyesno("🔄 Restablecer", 
+            "¿Restablecer a las imágenes base?", parent=parent_window)
+        
+        if respuesta:
+            self.encabezado_personalizado = None
+            self.insignia_personalizada = None
+            
+            # Actualizar estados
+            if hasattr(self, 'enc_custom_label'):
+                self.enc_custom_label.configure(text="Encabezado: ⏸️ No cargado")
+            if hasattr(self, 'ins_custom_label'):
+                self.ins_custom_label.configure(text="Insignia: ⏸️ No cargado")
+            
+            messagebox.showinfo("✅ Restablecido", "Imágenes restablecidas a las predeterminadas")
+
+    # ========== MÉTODOS AUXILIARES ==========
+
+    def get_secciones_iniciales(self):
+        """Define las secciones disponibles inicialmente"""
+        return {
+            "resumen": {
+                "titulo": "📄 Resumen", 
+                "instruccion": "Resumen ejecutivo del proyecto (150-300 palabras)",
+                "requerida": False,
+                "capitulo": False
+            },
+            "introduccion": {
+                "titulo": "🔍 Introducción", 
+                "instruccion": "Presenta el tema, contexto e importancia",
+                "requerida": True,
+                "capitulo": False
+            },
+            "capitulo1": {
+                "titulo": "📖 CAPÍTULO I", 
+                "instruccion": "Título de capítulo",
+                "requerida": False,
+                "capitulo": True
+            },
+            "planteamiento": {
+                "titulo": "❓ Planteamiento del Problema", 
+                "instruccion": "Define el problema a investigar",
+                "requerida": True,
+                "capitulo": False
+            },
+            "preguntas": {
+                "titulo": "❔ Preguntas de Investigación", 
+                "instruccion": "Pregunta general y específicas",
+                "requerida": True,
+                "capitulo": False
+            },
+            "delimitaciones": {
+                "titulo": "📏 Delimitaciones", 
+                "instruccion": "Límites del estudio (temporal, espacial, conceptual)",
+                "requerida": False,
+                "capitulo": False
+            },
+            "justificacion": {
+                "titulo": "💡 Justificación", 
+                "instruccion": "Explica por qué es importante investigar",
+                "requerida": True,
+                "capitulo": False
+            },
+            "objetivos": {
+                "titulo": "🎯 Objetivos", 
+                "instruccion": "General y específicos (verbos en infinitivo)",
+                "requerida": True,
+                "capitulo": False
+            },
+            "capitulo2": {
+                "titulo": "📚 CAPÍTULO II - ESTADO DEL ARTE", 
+                "instruccion": "Título de capítulo",
+                "requerida": False,
+                "capitulo": True
+            },
+            "marco_teorico": {
+                "titulo": "📖 Marco Teórico", 
+                "instruccion": "Base teórica y antecedentes (USA CITAS)",
+                "requerida": True,
+                "capitulo": False
+            },
+            "capitulo3": {
+                "titulo": "🔬 CAPÍTULO III", 
+                "instruccion": "Título de capítulo",
+                "requerida": False,
+                "capitulo": True
+            },
+            "metodologia": {
+                "titulo": "⚙️ Marco Metodológico", 
+                "instruccion": "Tipo de estudio y técnicas de recolección",
+                "requerida": True,
+                "capitulo": False
+            },
+            "capitulo4": {
+                "titulo": "🛠️ CAPÍTULO IV - DESARROLLO", 
+                "instruccion": "Título de capítulo",
+                "requerida": False,
+                "capitulo": True
+            },
+            "desarrollo": {
+                "titulo": "⚙️ Desarrollo", 
+                "instruccion": "Proceso de investigación paso a paso",
+                "requerida": False,
+                "capitulo": False
+            },
+            "capitulo5": {
+                "titulo": "📊 CAPÍTULO V - ANÁLISIS DE DATOS", 
+                "instruccion": "Título de capítulo",
+                "requerida": False,
+                "capitulo": True
+            },
+            "resultados": {
+                "titulo": "📊 Resultados", 
+                "instruccion": "Datos obtenidos (gráficos, tablas)",
+                "requerida": False,
+                "capitulo": False
+            },
+            "analisis_datos": {
+                "titulo": "📈 Análisis de Datos", 
+                "instruccion": "Interpretación de resultados",
+                "requerida": False,
+                "capitulo": False
+            },
+            "capitulo6": {
+                "titulo": "💬 CAPÍTULO VI", 
+                "instruccion": "Título de capítulo",
+                "requerida": False,
+                "capitulo": True
+            },
+            "discusion": {
+                "titulo": "💬 Discusión", 
+                "instruccion": "Confronta resultados con teoría",
+                "requerida": False,
+                "capitulo": False
+            },
+            "conclusiones": {
+                "titulo": "✅ Conclusiones", 
+                "instruccion": "Hallazgos principales y respuestas a objetivos",
+                "requerida": True,
+                "capitulo": False
+            }
+        }
+
+    def ir_a_seccion_actual(self):
+        """Navega a la sección actual en el contenido"""
+        if hasattr(self, 'content_tabview'):
+            current_tab = self.content_tabview.get()
+            if current_tab:
+                self.tabview.set("📝 Contenido Dinámico")
+                self.anunciar_estado(f"Navegando a sección: {current_tab}")
+
+    def buscar_en_contenido(self):
+        """Abre diálogo de búsqueda en el contenido"""
+        # Por implementar: diálogo de búsqueda
+        messagebox.showinfo("🔍 Buscar", "Función de búsqueda en desarrollo")
+    # Agregar estos métodos a la clase ProyectoAcademicoGenerator en ui/main_window.py
+    # ANTES del método run()
+
+    # ========== MÉTODOS DE IMPORTACIÓN/EXPORTACIÓN ==========
+
+    def importar_bibtex(self):
+        """Importa referencias desde archivo BibTeX"""
+        from tkinter import filedialog
+        
+        filename = filedialog.askopenfilename(
+            title="Seleccionar archivo BibTeX",
+            filetypes=[("Archivos BibTeX", "*.bib"), ("Todos los archivos", "*.*")]
+        )
+        
+        if filename:
+            try:
+                with open(filename, 'r', encoding='utf-8') as f:
+                    contenido_bibtex = f.read()
+                
+                # Parsear entradas BibTeX básicas
+                import re
+                entradas = re.findall(r'@\w+\{[^}]+\}', contenido_bibtex, re.DOTALL)
+                
+                referencias_importadas = 0
+                for entrada in entradas:
+                    try:
+                        # Extraer tipo
+                        tipo_match = re.match(r'@(\w+)\{', entrada)
+                        tipo = tipo_match.group(1) if tipo_match else 'Libro'
+                        
+                        # Extraer campos
+                        ref_data = {'tipo': tipo}
+                        
+                        # Buscar autor
+                        autor_match = re.search(r'author\s*=\s*["{]([^"}]+)["}]', entrada, re.IGNORECASE)
+                        if autor_match:
+                            ref_data['autor'] = autor_match.group(1).strip()
+                        
+                        # Buscar año
+                        year_match = re.search(r'year\s*=\s*["{]?(\d{4})["}]?', entrada, re.IGNORECASE)
+                        if year_match:
+                            ref_data['año'] = year_match.group(1)
+                        
+                        # Buscar título
+                        title_match = re.search(r'title\s*=\s*["{]([^"}]+)["}]', entrada, re.IGNORECASE)
+                        if title_match:
+                            ref_data['titulo'] = title_match.group(1).strip()
+                        
+                        # Buscar fuente (journal, publisher, etc.)
+                        fuente_match = re.search(r'(?:journal|publisher|booktitle)\s*=\s*["{]([^"}]+)["}]', entrada, re.IGNORECASE)
+                        if fuente_match:
+                            ref_data['fuente'] = fuente_match.group(1).strip()
+                        else:
+                            ref_data['fuente'] = ''
+                        
+                        # Agregar si tiene los campos mínimos
+                        if all(key in ref_data for key in ['autor', 'año', 'titulo']):
+                            self.referencias.append(ref_data)
+                            referencias_importadas += 1
+                            
+                    except Exception as e:
+                        print(f"Error procesando entrada: {e}")
+                        continue
+                
+                # Actualizar lista visual
+                self.actualizar_lista_referencias()
+                
+                # Actualizar contador
+                if hasattr(self, 'ref_stats_label'):
+                    self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+                
+                messagebox.showinfo("✅ Importación Exitosa", 
+                    f"Se importaron {referencias_importadas} referencias desde el archivo BibTeX")
+                    
+            except Exception as e:
+                messagebox.showerror("❌ Error", f"Error al importar archivo BibTeX:\n{str(e)}")
+
+    def eliminar_referencias_seleccionadas(self):
+        """Elimina las referencias seleccionadas"""
+        # Por ahora, elimina la última referencia
+        if self.referencias:
+            respuesta = messagebox.askyesno("🗑️ Confirmar", 
+                "¿Eliminar la última referencia agregada?")
+            
+            if respuesta:
+                self.referencias.pop()
+                self.actualizar_lista_referencias()
+                
+                # Actualizar contador
+                if hasattr(self, 'ref_stats_label'):
+                    self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+                
+                messagebox.showinfo("✅ Eliminada", "Referencia eliminada correctamente")
+        else:
+            messagebox.showwarning("⚠️ Sin referencias", "No hay referencias para eliminar")
+
+    def exportar_referencias_apa(self):
+        """Exporta las referencias en formato APA"""
+        if not self.referencias:
+            messagebox.showwarning("⚠️ Sin referencias", "No hay referencias para exportar")
+            return
+        
+        from tkinter import filedialog
+        
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Archivo de texto", "*.txt"), ("Todos los archivos", "*.*")],
+            title="Exportar Referencias APA"
+        )
+        
+        if filename:
+            try:
+                # Ordenar referencias por autor
+                referencias_ordenadas = sorted(self.referencias, 
+                                            key=lambda x: x['autor'].split(',')[0].strip())
+                
+                # Generar formato APA
+                referencias_apa = []
+                for ref in referencias_ordenadas:
+                    apa_ref = self._formatear_referencia_apa_export(ref)
+                    referencias_apa.append(apa_ref)
+                
+                # Escribir archivo
+                with open(filename, 'w', encoding='utf-8') as f:
+                    f.write("REFERENCIAS\n")
+                    f.write("="*50 + "\n\n")
+                    f.write("\n\n".join(referencias_apa))
+                
+                messagebox.showinfo("✅ Exportado", 
+                    f"Referencias exportadas exitosamente:\n{filename}")
+                    
+            except Exception as e:
+                messagebox.showerror("❌ Error", f"Error al exportar referencias:\n{str(e)}")
+
+    def _formatear_referencia_apa_export(self, ref):
+        """Formatea una referencia individual para exportación"""
+        tipo = ref.get('tipo', 'Libro')
+        autor = ref.get('autor', '')
+        año = ref.get('año', '')
+        titulo = ref.get('titulo', '')
+        fuente = ref.get('fuente', '')
+        
+        if tipo == 'Libro':
+            return f"{autor} ({año}). {titulo}. {fuente}."
+        elif tipo == 'Artículo':
+            return f"{autor} ({año}). {titulo}. {fuente}."
+        elif tipo == 'Web':
+            return f"{autor} ({año}). {titulo}. Recuperado de {fuente}"
+        elif tipo == 'Tesis':
+            return f"{autor} ({año}). {titulo} [Tesis]. {fuente}."
+        elif tipo == 'Conferencia':
+            return f"{autor} ({año}). {titulo}. Presentado en {fuente}."
+        elif tipo == 'Informe':
+            return f"{autor} ({año}). {titulo}. {fuente}."
+        else:
+            return f"{autor} ({año}). {titulo}. {fuente}."
+
+    def filtrar_referencias(self, event=None):
+        """Filtra las referencias según el término de búsqueda"""
+        termino = self.ref_search.get().lower() if hasattr(self, 'ref_search') else ""
+        
+        # Limpiar lista actual
+        for widget in self.ref_scroll_frame.winfo_children():
+            widget.destroy()
+        
+        # Mostrar solo referencias que coincidan
+        referencias_filtradas = []
+        for ref in self.referencias:
+            if (termino in ref['autor'].lower() or 
+                termino in ref['titulo'].lower() or 
+                termino in ref.get('fuente', '').lower() or
+                termino in ref.get('año', '')):
+                referencias_filtradas.append(ref)
+        
+        # Recrear lista visual con referencias filtradas
+        for i, ref in enumerate(referencias_filtradas):
+            ref_item_frame = ctk.CTkFrame(self.ref_scroll_frame, fg_color="gray20", corner_radius=8)
+            ref_item_frame.pack(fill="x", padx=5, pady=5)
+            
+            apa_ref = self._formatear_referencia_apa_export(ref)
+            ref_label = ctk.CTkLabel(
+                ref_item_frame, text=f"📖 {apa_ref}", 
+                font=ctk.CTkFont(size=11),
+                wraplength=800, justify="left"
+            )
+            ref_label.pack(padx=15, pady=10, anchor="w")
+            
+            # Botón eliminar individual
+            delete_btn = ctk.CTkButton(
+                ref_item_frame, text="🗑️", width=30, height=30,
+                command=lambda idx=self.referencias.index(ref): self.eliminar_referencia_individual(idx),
+                fg_color="red", hover_color="darkred"
+            )
+            delete_btn.pack(side="right", padx=10)
+        
+        # Mostrar mensaje si no hay coincidencias
+        if not referencias_filtradas and termino:
+            no_results_label = ctk.CTkLabel(
+                self.ref_scroll_frame, 
+                text="No se encontraron referencias que coincidan con la búsqueda",
+                font=ctk.CTkFont(size=12),
+                text_color="gray60"
+            )
+            no_results_label.pack(pady=20)
+
+    def actualizar_opacidad_preview(self, value):
+        """Actualiza el valor de opacidad de la marca de agua"""
+        self.watermark_opacity = float(value)
+        if hasattr(self, 'opacity_label'):
+            self.opacity_label.configure(text=f"{int(self.watermark_opacity * 100)}%")
+
+    def limpiar_validacion(self):
+        """Limpia el área de validación"""
+        if hasattr(self, 'validation_text'):
+            self.validation_text.delete("1.0", "end")
+            self.anunciar_estado("Panel de validación limpiado")
+
+    def mostrar_logs(self):
+        """Muestra los logs del sistema"""
+        logs = []
+        logs.append("📋 LOGS DEL SISTEMA\n")
+        logs.append("="*60 + "\n\n")
+        
+        from datetime import datetime
+        
+        # Log de inicio
+        logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Sistema iniciado\n")
+        logs.append(f"[{datetime.now().strftime('%H:%M:%S')}] Imágenes base cargadas\n")
+        
+        # Logs de actividad
+        if hasattr(self, 'project_manager') and hasattr(self.project_manager, 'last_save_time'):
+            if self.project_manager.last_save_time:
+                logs.append(f"[{self.project_manager.last_save_time.strftime('%H:%M:%S')}] Proyecto guardado\n")
+        
+        # Estado actual
+        logs.append(f"\n📊 ESTADO ACTUAL:\n")
+        logs.append(f"   • Secciones activas: {len(self.secciones_activas)}\n")
+        logs.append(f"   • Referencias: {len(self.referencias)}\n")
+        logs.append(f"   • Palabras totales: {self.stats.get('total_words', 0)}\n")
+        
+        self.validation_text.insert("1.0", ''.join(logs))
+
+    def mostrar_sugerencias(self):
+        """Muestra sugerencias inteligentes para mejorar el proyecto"""
+        sugerencias = []
+        sugerencias.append("💡 SUGERENCIAS INTELIGENTES\n")
+        sugerencias.append("="*60 + "\n\n")
+        
+        # Analizar estado del proyecto
+        palabras_totales = self.stats.get('total_words', 0)
+        secciones_completas = self.stats.get('sections_completed', 0)
+        referencias_total = len(self.referencias)
+        
+        # Sugerencias basadas en análisis
+        if palabras_totales < 1000:
+            sugerencias.append("📝 CONTENIDO:\n")
+            sugerencias.append("   • El proyecto tiene pocas palabras. Considera expandir las secciones principales.\n")
+            sugerencias.append("   • Objetivo mínimo recomendado: 3000-5000 palabras\n\n")
+        
+        if referencias_total < 5:
+            sugerencias.append("📚 REFERENCIAS:\n")
+            sugerencias.append("   • Agrega más referencias bibliográficas (mínimo 10-15 recomendadas)\n")
+            sugerencias.append("   • Incluye fuentes variadas: libros, artículos, sitios web confiables\n\n")
+        
+        # Verificar secciones críticas
+        secciones_vacias = []
+        for seccion_id in self.secciones_activas:
+            if seccion_id in self.secciones_disponibles and seccion_id in self.content_texts:
+                seccion = self.secciones_disponibles[seccion_id]
+                if seccion.get('requerida', False) and not seccion.get('capitulo', False):
+                    content = self.content_texts[seccion_id].get("1.0", "end").strip()
+                    if len(content) < 50:
+                        secciones_vacias.append(seccion['titulo'])
+        
+        if secciones_vacias:
+            sugerencias.append("⚠️ SECCIONES REQUERIDAS VACÍAS:\n")
+            for seccion in secciones_vacias:
+                sugerencias.append(f"   • {seccion}\n")
+            sugerencias.append("\n")
+        
+        # Sugerencias de formato
+        sugerencias.append("🎨 FORMATO Y ESTILO:\n")
+        if self.formato_config.get('interlineado', 2.0) != 2.0:
+            sugerencias.append("   • Considera usar interlineado doble (estándar académico)\n")
+        
+        # Sugerencias de mejora
+        sugerencias.append("\n✨ MEJORAS RECOMENDADAS:\n")
+        sugerencias.append("   • Revisa la coherencia entre objetivos y conclusiones\n")
+        sugerencias.append("   • Asegúrate de citar todas las referencias en el texto\n")
+        sugerencias.append("   • Incluye gráficos o tablas si son relevantes\n")
+        sugerencias.append("   • Verifica ortografía y gramática antes de generar\n")
+        
+        self.validation_text.insert("1.0", ''.join(sugerencias))
+
+    def cambiar_modo_preview(self, valor):
+        """Cambia el modo de vista previa"""
+        self.actualizar_preview()
+
+    def generar_preview_formato(self):
+        """Genera vista previa con formato aplicado"""
+        preview = []
+        preview.append("VISTA PREVIA CON FORMATO\n")
+        preview.append("="*40 + "\n\n")
+        
+        # Mostrar configuración actual
+        preview.append("📋 FORMATO APLICADO:\n")
+        preview.append(f"   • Fuente: {self.formato_config['fuente_texto']} {self.formato_config['tamaño_texto']}pt\n")
+        preview.append(f"   • Títulos: {self.formato_config['fuente_titulo']} {self.formato_config['tamaño_titulo']}pt\n")
+        preview.append(f"   • Interlineado: {self.formato_config['interlineado']}\n")
+        preview.append(f"   • Márgenes: {self.formato_config['margen']}cm\n")
+        preview.append(f"   • Justificado: {'Sí' if self.formato_config['justificado'] else 'No'}\n")
+        preview.append(f"   • Sangría: {'Sí' if self.formato_config['sangria'] else 'No'}\n\n")
+        
+        preview.append("-"*40 + "\n\n")
+        
+        # Ejemplo de texto formateado
+        preview.append("INTRODUCCIÓN\n\n")
+        preview.append("     Este es un ejemplo de cómo se verá el texto con el formato aplicado. ")
+        preview.append("La primera línea de cada párrafo tendrá sangría si está activada. ")
+        preview.append("El texto estará justificado para una apariencia profesional.\n\n")
+        
+        preview.append("     Un segundo párrafo mostraría la consistencia del formato. ")
+        preview.append("Las citas aparecerían así (García, 2020) integradas en el texto.\n\n")
+        
+        return ''.join(preview)
+
+    def ocultar_preview(self):
+        """Oculta la ventana de vista previa en lugar de destruirla"""
+        if hasattr(self, 'preview_window'):
+            self.preview_window.withdraw()
+
+    # ========== MÉTODOS ADICIONALES QUE PODRÍAN FALTAR ==========
+
+    def documento_base(self):
+        """Getter para documento_base"""
+        if not hasattr(self, '_documento_base'):
+            self._documento_base = None
+        return self._documento_base
+
+    @documento_base.setter
+    def documento_base(self, value):
+        """Setter para documento_base"""
+        self._documento_base = value
+
+    def contenido_guardado(self):
+        """Getter para contenido_guardado"""
+        if not hasattr(self, '_contenido_guardado'):
+            self._contenido_guardado = {}
+        return self._contenido_guardado
+
+    @contenido_guardado.setter  
+    def contenido_guardado(self, value):
+        """Setter para contenido_guardado"""
+        self._contenido_guardado = value
     def run(self):
         """Ejecuta la aplicación"""
         self.root.mainloop()
@@ -714,5 +1867,3 @@ class ProyectoAcademicoGenerator:
         
         messagebox.showinfo("✅ Aplicado", "Configuración de formato aplicada correctamente")
     
-    # Métodos requeridos restantes (agregar implementaciones según necesidad)
-    # ... más métodos necesarios ...
