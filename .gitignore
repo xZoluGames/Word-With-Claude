@@ -24,4 +24,4 @@ auto_save.json
 temp_images
 
 # Word
-.docx
+*.docx
