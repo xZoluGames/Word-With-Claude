@@ -28,6 +28,8 @@ import re
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
 from utils.logger import get_logger
+from utils.validators import Validators, ReferenceValidator, validar_y_sanitizar_entrada
+
 logger = get_logger('ReferenceManager')
 class ReferenceManager:
     """
@@ -86,66 +88,47 @@ class ReferenceManager:
         
         Args:
             ref_data: Diccionario con los datos de la referencia
-                - tipo (str): Tipo de referencia (Libro, Artículo, etc.)
-                - autor (str): Autor(es) en formato APA
-                - año (str): Año de publicación
-                - titulo (str): Título de la obra
-                - fuente (str): Editorial, revista, URL, etc.
-        
+            
         Returns:
             Dict: La referencia agregada con ID y metadatos
-        
+            
         Raises:
-            ValueError: Si faltan campos requeridos o el formato es inválido
-        
-        Example:
-            >>> ref_data = {
-            ...     'tipo': 'Libro',
-            ...     'autor': 'García, J.',
-            ...     'año': '2023',
-            ...     'titulo': 'Python Avanzado',
-            ...     'fuente': 'Editorial Tech'
-            ... }
-            >>> ref = ref_manager.agregar_referencia(ref_data)
+            ValueError: Si hay errores de validación
         """
         logger.debug(f"Agregando referencia: {ref_data.get('titulo', 'Sin título')}")
         
-        # Validar tipo
-        tipo = ref_data.get('tipo', 'Libro')
-        if tipo not in self.tipos_referencia:
-            raise ValueError(f"Tipo de referencia no válido: {tipo}")
+        # Sanitizar entradas
+        for campo in ['autor', 'titulo', 'fuente']:
+            if campo in ref_data:
+                ref_data[campo], errores = validar_y_sanitizar_entrada(
+                    ref_data[campo], 
+                    tipo=campo if campo in ['autor', 'titulo'] else 'general'
+                )
+                if errores:
+                    raise ValueError(f"Error en {campo}: {'; '.join(errores)}")
         
-        # Validar campos requeridos según el tipo
-        campos_requeridos = self.tipos_referencia[tipo].get('campos_requeridos', ['autor', 'año', 'titulo'])
-        for campo in campos_requeridos:
-            if campo not in ref_data or not ref_data[campo].strip():
-                raise ValueError(f"El campo '{campo}' es requerido para referencias tipo {tipo}")
+        # Validación completa usando el nuevo sistema
+        errores = ReferenceValidator.validar_referencia_completa(ref_data)
+        if errores:
+            logger.warning(f"Errores de validación: {errores}")
+            raise ValueError("Errores de validación:\n" + "\n".join(errores))
         
-        # Validar año
-        try:
-            año = int(ref_data['año'])
-            if año < 1800 or año > datetime.now().year + 1:
-                raise ValueError("Año fuera de rango válido")
-        except ValueError:
-            raise ValueError("El año debe ser un número válido entre 1800 y el año actual")
-        
-        # Validar formato del autor
-        if not self._validar_formato_autor(ref_data['autor']):
-            raise ValueError(
-                "Formato de autor incorrecto. Use: 'Apellido, N.' o 'Apellido, N. M.' "
-                "o 'Apellido1, N. y Apellido2, M.'"
-            )
+        # Si es una URL, validar específicamente
+        if ref_data.get('tipo') == 'Web' and 'fuente' in ref_data:
+            es_valida, error = Validators.validar_url(ref_data['fuente'])
+            if not es_valida:
+                raise ValueError(f"URL inválida: {error}")
         
         # Crear referencia con metadatos
         referencia = {
             'id': len(self.referencias) + 1,
             'fecha_agregada': datetime.now().isoformat(),
-            'tipo': tipo,
+            'tipo': ref_data.get('tipo', 'Libro'),
             **ref_data
         }
         
         self.referencias.append(referencia)
-        logger.info(f"Referencia agregada: ID={referencia['id']}, Tipo={tipo}")
+        logger.info(f"Referencia agregada: ID={referencia['id']}, Tipo={referencia['tipo']}")
         
         return referencia
     
@@ -291,13 +274,18 @@ class ReferenceManager:
             'tipo_mas_usado': max(tipos_count.items(), key=lambda x: x[1])[0] if tipos_count else 'N/A'
         }
     
-    def _validar_formato_autor(self, autor):
-        """Valida que el autor tenga formato APA correcto"""
-        # Patrones válidos: "Apellido, N." o "Apellido, N. M." o "Apellido, N. M. y Apellido2, P."
-        patron_simple = r'^[A-ZÁ-Ž][a-záñü]+(?:\s[A-ZÁ-Ž][a-záñü]+)?,\s[A-Z]\.(?:\s[A-Z]\.)?$'
-        patron_multiple = r'^[A-ZÁ-Ž][a-záñü]+(?:\s[A-ZÁ-Ž][a-záñü]+)?,\s[A-Z]\.(?:\s[A-Z]\.)?\sy\s[A-ZÁ-Ž][a-záñü]+(?:\s[A-ZÁ-Ž][a-záñü]+)?,\s[A-Z]\.(?:\s[A-Z]\.)?$'
+    def _validar_formato_autor(self, autor: str) -> bool:
+        """
+        Valida que el autor tenga formato APA correcto.
         
-        return bool(re.match(patron_simple, autor) or re.match(patron_multiple, autor))
+        Args:
+            autor: String con el autor
+            
+        Returns:
+            bool: True si es válido, False en caso contrario
+        """
+        es_valido, _ = Validators.validar_autor(autor)
+        return es_valido
     
     def _parsear_bibtex_entrada(self, entrada):
         """Parsea una entrada BibTeX y extrae los datos"""

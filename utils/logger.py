@@ -79,3 +79,9 @@ def log_action(module_name, action, details=""):
     """Registra una acción del usuario"""
     logger = get_logger(module_name)
     logger.info(f"Acción: {action} - {details}")
+# Agregar en utils/logger.py:
+def configure_module_logging(module_name, level=logging.INFO):
+    """Configura nivel de logging específico por módulo"""
+    logger = logging.getLogger(f'ProyectoAcademico.{module_name}')
+    logger.setLevel(level)
+    return logger
