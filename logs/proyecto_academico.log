@@ -39,3 +39,19 @@
 2025-05-24 22:50:49,443 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
 2025-05-24 22:51:01,845 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
 2025-05-24 22:51:04,152 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
+2025-05-25 11:00:15,294 - ProyectoAcademico - INFO - setup_logger:89 - Sistema de logging inicializado correctamente
+2025-05-25 11:00:15,318 - ProyectoAcademico.settings - INFO - ensure_directories:204 - Directorios de recursos verificados/creados
+2025-05-25 11:00:15,318 - ProyectoAcademico.settings - INFO - validate_config:231 - Configuración validada correctamente
+2025-05-25 11:00:15,417 - ProyectoAcademico.CacheSystem - INFO - __init__:51 - CacheManager inicializado - Dir: cache
+2025-05-25 11:00:15,429 - ProyectoAcademico.main - INFO - setup_application:37 - Iniciando Generador de Proyectos Académicos v2.1.0
+2025-05-25 11:00:15,549 - ProyectoAcademico.ProjectManager - INFO - __init__:30 - ProjectManager inicializado
+2025-05-25 11:00:15,549 - ProyectoAcademico.WatermarkManager - INFO - __init__:50 - WatermarkManager inicializado
+2025-05-25 11:00:15,549 - ProyectoAcademico.document_generator - INFO - __init__:48 - DocumentGenerator inicializado
+2025-05-25 11:00:15,550 - ProyectoAcademico.ReferenceManager - INFO - __init__:51 - Inicializando ReferenceManager
+2025-05-25 11:00:15,552 - ProyectoAcademico.MainWindow - INFO - _init_state_manager:2247 - StateManager integrado correctamente
+2025-05-25 11:00:15,836 - ProyectoAcademico.MainWindow - ERROR - _create_tabs:2451 - Error creando pestañas: 'ProyectoAcademicoGenerator' object has no attribute 'toggle_sidebar'
+2025-05-25 11:00:15,837 - ProyectoAcademico.MainWindow - INFO - _setup_ui:2327 - Interfaz de usuario configurada
+2025-05-25 11:00:15,837 - ProyectoAcademico.MainWindow - INFO - __init__:2157 - Aplicación inicializada correctamente
+2025-05-25 11:00:15,837 - ProyectoAcademico.MainWindow - INFO - run:2718 - Iniciando interfaz principal
+2025-05-25 11:00:52,148 - ProyectoAcademico.MainWindow - INFO - run:2724 - Aplicación cerrada
+2025-05-25 11:00:52,149 - ProyectoAcademico.main - INFO - main:59 - Aplicación finalizada

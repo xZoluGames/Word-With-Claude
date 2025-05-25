@@ -1,8 +1,26 @@
-Pillow>=9.0.0
+# Dependencias principales del Generador de Proyectos Académicos
+# Versión: 2.1.0
+# Autor: xZoluGames
+
+# Interfaz gráfica
 customtkinter>=5.2.0
-lxml>=4.9.0
+
+# Procesamiento de imágenes
+Pillow>=10.0.0
+
+# Generación de documentos Word
 python-docx>=0.8.11
-pyspellchecker>=0.7.0
-language-tool-python>=2.7.0
-textstat>=0.7.3
-nltk>=3.8.0
+
+# Utilidades adicionales (opcionales)
+requests>=2.31.0
+pathlib2>=2.3.7; python_version < "3.4"
+
+# Desarrollo y testing (opcional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
+flake8>=6.0.0
+black>=23.0.0
+
+# Documentación (opcional)
+sphinx>=7.0.0
+sphinx-rtd-theme>=1.3.0

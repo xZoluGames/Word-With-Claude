@@ -1,53 +1,374 @@
+"""
+Generador de documentos Word - Versión Optimizada con manejo robusto de errores
+"""
+
+import os
+import re
+import threading
+from datetime import datetime
+from pathlib import Path
+from tkinter import filedialog, messagebox
+
+try:
+    from docx import Document
+    from docx.shared import Inches, Pt, RGBColor, Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_BREAK
+    from docx.enum.style import WD_STYLE_TYPE
+    from docx.enum.section import WD_SECTION, WD_ORIENTATION
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+try:
+    from modules.watermark import WatermarkManager
+except ImportError:
+    WatermarkManager = None
 
 from utils.logger import get_logger
+from config.settings import DEFAULT_FORMAT
 
 logger = get_logger("document_generator")
 
-"""
-Generador de documentos Word - Versión Corregida con Encabezados como Marca de Agua y sangría APA perfecta
-"""
-
-from docx import Document
-from docx.shared import Inches, Pt, RGBColor, Cm
-from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING, WD_BREAK
-from docx.enum.style import WD_STYLE_TYPE
-from docx.enum.section import WD_SECTION, WD_ORIENTATION
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
-from modules.watermark import WatermarkManager
-import threading
-import os
-from datetime import datetime
-from tkinter import filedialog, messagebox
-import re
-
 class DocumentGenerator:
+    """Generador de documentos Word con manejo robusto de errores"""
+    
     def __init__(self):
-        self.formato_config = {
-            'fuente_texto': 'Times New Roman',
-            'tamaño_texto': 12,
-            'fuente_titulo': 'Times New Roman', 
-            'tamaño_titulo': 14,
-            'interlineado': 2.0,
-            'margen': 2.54,
-            'justificado': True,
-            'sangria': True
-        }
-        self.watermark_manager = WatermarkManager()
+        if not DOCX_AVAILABLE:
+            logger.error("python-docx no está disponible. Instala con: pip install python-docx")
+            
+        self.formato_config = DEFAULT_FORMAT.copy()
+        self.watermark_manager = WatermarkManager() if WatermarkManager else None
+        
+        # Configuración de generación
+        self.max_image_size = (1920, 1080)
+        self.supported_image_formats = ['.png', '.jpg', '.jpeg', '.gif', '.bmp']
+        
+        logger.info("DocumentGenerator inicializado")
+
+    def generar_documento_async(self, app_instance):
+        """Genera el documento profesional en un hilo separado con manejo robusto"""
+        if not DOCX_AVAILABLE:
+            messagebox.showerror("❌ Error", 
+                "python-docx no está disponible.\n"
+                "Instala la dependencia con:\n"
+                "pip install python-docx")
+            return
+        
+        def generar():
+            try:
+                # Validar datos antes de generar
+                if not self._validar_datos_proyecto(app_instance):
+                    return
+                
+                # Inicializar progreso
+                self._inicializar_progreso(app_instance)
+                
+                # Crear documento
+                doc = Document()
+                logger.info("Iniciando generación de documento")
+                
+                # Configurar documento base
+                self.configurar_documento_completo(doc, app_instance)
+                self._actualizar_progreso(app_instance, 0.1, "Configuración aplicada")
+                
+                # Generar secciones según configuración
+                self._generar_secciones_documento(doc, app_instance)
+                
+                # Finalizar y guardar
+                self._guardar_documento_final(doc, app_instance)
+                
+            except PermissionError as e:
+                self._manejar_error(app_instance, "Error de permisos", 
+                    "No se tiene permiso para escribir en la ubicación seleccionada")
+            except FileNotFoundError as e:
+                self._manejar_error(app_instance, "Archivo no encontrado", 
+                    f"No se pudo encontrar un archivo necesario: {str(e)}")
+            except Exception as e:
+                self._manejar_error(app_instance, "Error inesperado", str(e))
+        
+        # Ejecutar en hilo separado
+        thread = threading.Thread(target=generar, daemon=True)
+        thread.start()
+    
+    def _validar_datos_proyecto(self, app_instance) -> bool:
+        """Valida que los datos del proyecto son suficientes para generar"""
+        try:
+            # Verificar información básica
+            if not hasattr(app_instance, 'proyecto_data'):
+                messagebox.showerror("❌ Error", "No hay datos de proyecto disponibles")
+                return False
+            
+            # Verificar al menos un campo de información general
+            campos_basicos = ['titulo', 'estudiantes', 'institucion']
+            tiene_info_basica = False
+            
+            for campo in campos_basicos:
+                if (campo in app_instance.proyecto_data and 
+                    hasattr(app_instance.proyecto_data[campo], 'get') and
+                    app_instance.proyecto_data[campo].get().strip()):
+                    tiene_info_basica = True
+                    break
+            
+            if not tiene_info_basica:
+                respuesta = messagebox.askyesno("⚠️ Información Incompleta",
+                    "No hay información básica del proyecto.\n"
+                    "¿Desea generar el documento de todas formas?")
+                return respuesta
+            
+            # Verificar contenido
+            if hasattr(app_instance, 'content_texts'):
+                tiene_contenido = any(
+                    text_widget.get("1.0", "end").strip() 
+                    for text_widget in app_instance.content_texts.values()
+                    if hasattr(text_widget, 'get')
+                )
+                
+                if not tiene_contenido:
+                    respuesta = messagebox.askyesno("⚠️ Sin Contenido",
+                        "No hay contenido en las secciones.\n"
+                        "¿Desea generar un documento en blanco?")
+                    return respuesta
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error validando datos del proyecto: {e}")
+            return False
+    
+    def _generar_secciones_documento(self, doc, app_instance):
+        """Genera todas las secciones del documento según configuración"""
+        try:
+            progress_step = 0.7 / 7  # 70% dividido entre las secciones principales
+            current_progress = 0.2
+            
+            # Portada
+            if getattr(app_instance, 'incluir_portada', ctk.BooleanVar()).get():
+                self.crear_portada_profesional(doc, app_instance)
+                current_progress += progress_step
+                self._actualizar_progreso(app_instance, current_progress, "Portada creada")
+            
+            # Agradecimientos
+            if getattr(app_instance, 'incluir_agradecimientos', ctk.BooleanVar()).get():
+                self._crear_agradecimientos(doc, app_instance)
+                current_progress += progress_step
+                self._actualizar_progreso(app_instance, current_progress, "Agradecimientos agregados")
+            
+            # Resumen
+            if self._seccion_tiene_contenido(app_instance, 'resumen'):
+                self._crear_seccion_resumen(doc, app_instance)
+                current_progress += progress_step
+                self._actualizar_progreso(app_instance, current_progress, "Resumen agregado")
+            
+            # Índice
+            if getattr(app_instance, 'incluir_indice', ctk.BooleanVar()).get():
+                self.crear_indice_profesional(doc, app_instance)
+                current_progress += progress_step
+                self._actualizar_progreso(app_instance, current_progress, "Índice creado")
+            
+            # Contenido principal dinámico
+            self.crear_contenido_dinamico_mejorado(doc, app_instance)
+            current_progress += progress_step * 2
+            self._actualizar_progreso(app_instance, current_progress, "Contenido principal generado")
+            
+            # Referencias
+            if hasattr(app_instance, 'referencias') and app_instance.referencias:
+                self.crear_referencias_profesionales(doc, app_instance)
+                current_progress += progress_step
+                self._actualizar_progreso(app_instance, current_progress, "Referencias agregadas")
+            
+        except Exception as e:
+            logger.error(f"Error generando secciones: {e}")
+            raise
+    
+    def _crear_agradecimientos(self, doc, app_instance):
+        """Crea la sección de agradecimientos"""
+        contenido_default = """Agradezco sinceramente a todas las personas que hicieron posible la realización de este proyecto académico.
+
+A mis tutores y profesores por su guía y conocimientos compartidos.
+
+A mi familia y amigos por su apoyo incondicional durante todo el proceso.
+
+A la institución educativa por brindar los recursos y el ambiente necesario para el desarrollo de esta investigación."""
+        
+        contenido = contenido_default
+        
+        # Buscar contenido personalizado
+        if (hasattr(app_instance, 'content_texts') and 
+            'agradecimientos' in app_instance.content_texts):
+            contenido_custom = app_instance.content_texts['agradecimientos'].get("1.0", "end").strip()
+            if contenido_custom:
+                contenido = contenido_custom
+        
+        self.crear_seccion_profesional(
+            doc, "AGRADECIMIENTOS", contenido, app_instance, 
+            nivel=1, aplicar_sangria_parrafos=False
+        )
+    
+    def _crear_seccion_resumen(self, doc, app_instance):
+        """Crea la sección de resumen"""
+        if 'resumen' in app_instance.content_texts:
+            contenido_resumen = app_instance.content_texts['resumen'].get("1.0", "end").strip()
+            if contenido_resumen:
+                contenido_normalizado = self.normalizar_parrafos(contenido_resumen)
+                self.crear_seccion_profesional(
+                    doc, "RESUMEN", contenido_normalizado, app_instance, 
+                    nivel=1, aplicar_sangria_parrafos=False
+                )
+    
+    def _seccion_tiene_contenido(self, app_instance, seccion_id) -> bool:
+        """Verifica si una sección tiene contenido"""
+        try:
+            if (hasattr(app_instance, 'content_texts') and 
+                seccion_id in app_instance.content_texts):
+                contenido = app_instance.content_texts[seccion_id].get("1.0", "end").strip()
+                return len(contenido) > 10
+            return False
+        except:
+            return False
+    
+    def _inicializar_progreso(self, app_instance):
+        """Inicializa la barra de progreso"""
+        try:
+            if hasattr(app_instance, 'progress'):
+                app_instance.progress.set(0)
+                if hasattr(app_instance.progress, 'start'):
+                    app_instance.progress.start()
+        except Exception as e:
+            logger.warning(f"No se pudo inicializar progreso: {e}")
+    
+    def _actualizar_progreso(self, app_instance, valor, mensaje=""):
+        """Actualiza la barra de progreso con mensaje"""
+        try:
+            if hasattr(app_instance, 'progress'):
+                app_instance.progress.set(valor)
+            
+            if mensaje and hasattr(app_instance, 'validation_text'):
+                app_instance.validation_text.delete("1.0", "end")
+                app_instance.validation_text.insert("1.0", f"🔄 Generando documento...\n\n{mensaje}")
+                
+            logger.info(f"Progreso: {int(valor*100)}% - {mensaje}")
+            
+        except Exception as e:
+            logger.warning(f"Error actualizando progreso: {e}")
+    
+    def _manejar_error(self, app_instance, titulo, mensaje):
+        """Maneja errores durante la generación"""
+        try:
+            if hasattr(app_instance, 'progress'):
+                app_instance.progress.stop()
+                app_instance.progress.set(0)
+            
+            if hasattr(app_instance, 'validation_text'):
+                app_instance.validation_text.delete("1.0", "end")
+                app_instance.validation_text.insert("1.0", f"❌ Error en generación:\n\n{mensaje}")
+            
+            logger.error(f"{titulo}: {mensaje}")
+            messagebox.showerror(f"❌ {titulo}", mensaje)
+            
+        except Exception as e:
+            logger.error(f"Error manejando error: {e}")
+    
+    def _guardar_documento_final(self, doc, app_instance):
+        """Guarda el documento final con validaciones"""
+        try:
+            # Sugerir nombre de archivo
+            nombre_sugerido = self._generar_nombre_archivo(app_instance)
+            
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".docx",
+                filetypes=[
+                    ("Documentos Word", "*.docx"),
+                    ("Todos los archivos", "*.*")
+                ],
+                title="Guardar Proyecto Académico",
+                initialname=nombre_sugerido
+            )
+            
+            if not filename:
+                self._finalizar_progreso(app_instance, False)
+                return
+            
+            # Validar extensión
+            if not filename.lower().endswith('.docx'):
+                filename += '.docx'
+            
+            # Verificar permisos de escritura
+            try:
+                test_path = Path(filename).parent / "test_write.tmp"
+                test_path.touch()
+                test_path.unlink()
+            except Exception:
+                raise PermissionError("No se tiene permiso de escritura en la ubicación seleccionada")
+            
+            # Guardar documento
+            doc.save(filename)
+            
+            # Verificar que se guardó correctamente
+            if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+                raise IOError("El documento no se guardó correctamente")
+            
+            self._finalizar_progreso(app_instance, True)
+            self.mostrar_mensaje_exito(filename, app_instance)
+            
+            logger.info(f"Documento guardado exitosamente: {filename}")
+            
+        except Exception as e:
+            logger.error(f"Error guardando documento: {e}")
+            raise
+    
+    def _generar_nombre_archivo(self, app_instance) -> str:
+        """Genera un nombre de archivo sugerido basado en el proyecto"""
+        try:
+            # Intentar usar el título del proyecto
+            if (hasattr(app_instance, 'proyecto_data') and 
+                'titulo' in app_instance.proyecto_data):
+                titulo = app_instance.proyecto_data['titulo'].get().strip()
+                if titulo:
+                    # Limpiar caracteres no válidos para nombres de archivo
+                    titulo_limpio = re.sub(r'[<>:"/\\|?*]', '', titulo)
+                    titulo_limpio = titulo_limpio.replace('\n', ' ').strip()
+                    if len(titulo_limpio) > 50:
+                        titulo_limpio = titulo_limpio[:50] + "..."
+                    return f"{titulo_limpio}.docx"
+            
+            # Nombre por defecto con timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            return f"proyecto_academico_{timestamp}.docx"
+            
+        except Exception as e:
+            logger.warning(f"Error generando nombre de archivo: {e}")
+            return f"proyecto_academico_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"
+    
+    def _finalizar_progreso(self, app_instance, exitoso=True):
+        """Finaliza la barra de progreso"""
+        try:
+            if hasattr(app_instance, 'progress'):
+                if hasattr(app_instance.progress, 'stop'):
+                    app_instance.progress.stop()
+                app_instance.progress.set(1 if exitoso else 0)
+        except Exception as e:
+            logger.warning(f"Error finalizando progreso: {e}")
 
     def normalizar_parrafos(self, contenido):
-        """
-        Convierte saltos simples de línea en dobles saltos, salvo que ya existan dobles saltos.
-        Así, cada párrafo quedará correctamente separado para el procesamiento en Word.
-        """
+        """Normaliza párrafos con validación mejorada"""
+        if not isinstance(contenido, str):
+            return ""
+        
         texto = contenido.strip()
-        # Si ya hay dobles saltos, no hagas nada
+        if not texto:
+            return ""
+        
+        # Si ya hay dobles saltos, mantener estructura
         if '\n\n' in texto:
             return texto
-        # Si no, cada salto simple equivale a un nuevo párrafo
+        
+        # Convertir saltos simples en dobles
         lineas = texto.split('\n')
-        # Une cada línea como un párrafo separado, descartando líneas vacías
-        return '\n\n'.join([linea.strip() for linea in lineas if linea.strip()])
+        parrafos = [linea.strip() for linea in lineas if linea.strip()]
+        
+        return '\n\n'.join(parrafos)
 
     def generar_documento_async(self, app_instance):
         """Genera el documento profesional en un hilo separado"""
@@ -123,48 +444,128 @@ class DocumentGenerator:
         thread.start()
     
     def configurar_documento_completo(self, doc, app_instance):
-        for section in doc.sections:
-            section.top_margin = Inches(app_instance.formato_config['margen'] / 2.54)
-            section.bottom_margin = Inches(app_instance.formato_config['margen'] / 2.54)
-            section.left_margin = Inches(app_instance.formato_config['margen'] / 2.54)
-            section.right_margin = Inches(app_instance.formato_config['margen'] / 2.54)
-            self.configurar_encabezado_marca_agua(section, app_instance)
-        self.configurar_estilos_profesionales(doc, app_instance)
-    
+        """Configura el documento con validación de errores"""
+        try:
+            # Configurar márgenes
+            for section in doc.sections:
+                margen_cm = app_instance.formato_config.get('margen', 2.54)
+                margen_inches = margen_cm / 2.54
+                
+                section.top_margin = Inches(margen_inches)
+                section.bottom_margin = Inches(margen_inches)
+                section.left_margin = Inches(margen_inches)
+                section.right_margin = Inches(margen_inches)
+                
+                # Configurar encabezado
+                self.configurar_encabezado_marca_agua(section, app_instance)
+            
+            # Configurar estilos
+            self.configurar_estilos_profesionales(doc, app_instance)
+            
+        except Exception as e:
+            logger.error(f"Error configurando documento: {e}")
+            # Continuar con configuración básica
+            self._configurar_documento_basico(doc)
+    def _configurar_documento_basico(self, doc):
+        """Configuración básica de respaldo"""
+        try:
+            for section in doc.sections:
+                section.top_margin = Inches(1)
+                section.bottom_margin = Inches(1)
+                section.left_margin = Inches(1)
+                section.right_margin = Inches(1)
+            
+            # Estilo normal básico
+            style = doc.styles['Normal']
+            style.font.name = 'Times New Roman'
+            style.font.size = Pt(12)
+            
+        except Exception as e:
+            logger.error(f"Error en configuración básica: {e}")
     def configurar_encabezado_marca_agua(self, section, app_instance):
+        """Configura encabezado con manejo robusto de errores"""
         try:
             section.different_first_page_header_footer = True
-            section.top_margin = Cm(2.5)
-            section.bottom_margin = Cm(2.5)
-            section.left_margin = Cm(3)
-            section.right_margin = Cm(3)
             section.header_distance = Cm(1.25)
             section.footer_distance = Cm(1.25)
+            
             ruta_encabezado = self.obtener_ruta_imagen("encabezado", app_instance)
+            
             if ruta_encabezado and os.path.exists(ruta_encabezado):
-                opacity = getattr(app_instance, 'watermark_opacity', 0.3)
-                stretch = getattr(app_instance, 'watermark_stretch', True)
-                mode = getattr(app_instance, 'watermark_mode', 'watermark')
-                header = section.header
-                for para in header.paragraphs:
-                    p = para._element
-                    p.getparent().remove(p)
-                header_para = header.add_paragraph()
-                header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                run = header_para.add_run()
-                if mode == 'watermark' and hasattr(self, 'watermark_manager'):
-                    try:
-                        header_pic = run.add_picture(ruta_encabezado, width=self.watermark_manager.header_config['width'])
-                        self.watermark_manager.configurar_imagen_detras_texto(header_pic, self.watermark_manager.header_config)
-                    except Exception:
-                        self.watermark_manager.add_simple_header_image(section, ruta_encabezado)
-                else:
-                    run.add_picture(ruta_encabezado, width=Cm(20.96))
+                self._configurar_encabezado_con_imagen(section, ruta_encabezado, app_instance)
             else:
                 self._configurar_encabezado_simple(section, app_instance)
-        except Exception:
+                
+        except Exception as e:
+            logger.warning(f"Error configurando encabezado: {e}")
             self._configurar_encabezado_simple(section, app_instance)
+    def _configurar_encabezado_con_imagen(self, section, ruta_imagen, app_instance):
+        """Configura encabezado con imagen"""
+        try:
+            header = section.header
+            
+            # Limpiar encabezado existente
+            for para in header.paragraphs:
+                p = para._element
+                p.getparent().remove(p)
+            
+            # Agregar imagen
+            header_para = header.add_paragraph()
+            header_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = header_para.add_run()
+            
+            # Validar formato de imagen
+            if not any(ruta_imagen.lower().endswith(ext) for ext in self.supported_image_formats):
+                logger.warning(f"Formato de imagen no soportado: {ruta_imagen}")
+                raise ValueError("Formato de imagen no soportado")
+            
+            # Agregar imagen con tamaño controlado
+            run.add_picture(ruta_imagen, width=Cm(20))
+            
+            if self.watermark_manager:
+                try:
+                    header_pic = run.element.xpath('.//pic:pic')[0] if run.element.xpath('.//pic:pic') else None
+                    if header_pic:
+                        self.watermark_manager.configurar_imagen_detras_texto(
+                            header_pic, 
+                            self.watermark_manager.header_config
+                        )
+                except Exception as e:
+                    logger.warning(f"Error aplicando marca de agua: {e}")
+            
+        except Exception as e:
+            logger.warning(f"Error configurando encabezado con imagen: {e}")
+            raise
     
+    def _configurar_encabezado_simple(self, section, app_instance):
+        """Configura encabezado simple con texto"""
+        try:
+            header = section.header
+            
+            # Limpiar encabezado existente
+            for para in header.paragraphs:
+                p = para._element
+                p.getparent().remove(p)
+            
+            # Agregar texto
+            p = header.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Obtener nombre de institución
+            institucion = "INSTITUCIÓN EDUCATIVA"
+            if (hasattr(app_instance, 'proyecto_data') and 
+                'institucion' in app_instance.proyecto_data):
+                institucion_custom = app_instance.proyecto_data['institucion'].get()
+                if institucion_custom:
+                    institucion = institucion_custom.upper()
+            
+            run = p.add_run(institucion)
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(14)
+            run.font.bold = True
+            
+        except Exception as e:
+            logger.error(f"Error configurando encabezado simple: {e}")
     def _configurar_encabezado_simple(self, section, app_instance):
         try:
             header = section.header
@@ -514,30 +915,52 @@ class DocumentGenerator:
             return (getattr(app_instance, 'insignia_personalizada', None) or 
                    getattr(app_instance, 'ruta_insignia', None))
         return None
-    
+
     def mostrar_mensaje_exito(self, filename, app_instance):
-        app_instance.validation_text.delete("1.0", "end")
-        app_instance.validation_text.insert("1.0", 
-            f"🎉 ¡DOCUMENTO PROFESIONAL GENERADO!\n\n"
-            f"📄 Archivo: {os.path.basename(filename)}\n"
-            f"📍 Ubicación: {filename}\n\n"
-            f"✅ MEJORAS APLICADAS:\n"
-            f"   • Encabezados como marca de agua\n"
-            f"   • Títulos en color negro\n"
-            f"   • Niveles de esquema correctos\n"
-            f"   • Formato de citas mejorado\n"
-            f"   • Referencias APA optimizadas\n\n"
-            f"📋 PARA COMPLETAR EN WORD:\n"
-            f"   • Referencias > Tabla de contenido > Automática\n"
-            f"   • El índice detectará todos los niveles\n\n"
-            f"🚀 ¡Tu proyecto está listo con calidad profesional!"
-        )
-        messagebox.showinfo("🎉 ¡Éxito Total!", 
-            f"Documento generado con todas las mejoras:\n{filename}\n\n"
-            f"Características implementadas:\n"
-            f"• Encabezados como marca de agua\n"
-            f"• Títulos en negro (no azul)\n"
-            f"• Niveles de esquema funcionales\n"
-            f"• Sistema de citas optimizado\n"
-            f"• Formato profesional completo")
+        """Muestra mensaje de éxito mejorado"""
+        try:
+            # Calcular estadísticas del documento
+            file_size = os.path.getsize(filename)
+            file_size_mb = file_size / (1024 * 1024)
+            
+            # Actualizar área de validación
+            if hasattr(app_instance, 'validation_text'):
+                mensaje_completo = (
+                    f"🎉 ¡DOCUMENTO GENERADO EXITOSAMENTE!\n\n"
+                    f"📄 Archivo: {os.path.basename(filename)}\n"
+                    f"📍 Ubicación: {filename}\n"
+                    f"📊 Tamaño: {file_size_mb:.2f} MB\n"
+                    f"⏰ Generado: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n\n"
+                    f"✅ CARACTERÍSTICAS APLICADAS:\n"
+                    f"   • Formato académico profesional\n"
+                    f"   • Encabezados personalizados\n"
+                    f"   • Niveles de esquema para índice automático\n"
+                    f"   • Formato de citas APA\n"
+                    f"   • Referencias bibliográficas ordenadas\n"
+                    f"   • Márgenes y tipografía estándar\n\n"
+                    f"📋 PRÓXIMOS PASOS:\n"
+                    f"   1. Abrir el documento en Microsoft Word\n"
+                    f"   2. Ir a Referencias > Tabla de contenido\n"
+                    f"   3. Seleccionar estilo automático\n"
+                    f"   4. Revisar y ajustar según necesidades\n\n"
+                    f"🚀 ¡Tu proyecto académico está listo!"
+                )
+                
+                app_instance.validation_text.delete("1.0", "end")
+                app_instance.validation_text.insert("1.0", mensaje_completo)
+            
+            # Mostrar diálogo de éxito
+            messagebox.showinfo("🎉 ¡Generación Exitosa!", 
+                f"Documento generado correctamente:\n\n"
+                f"📄 {os.path.basename(filename)}\n"
+                f"📊 Tamaño: {file_size_mb:.2f} MB\n\n"
+                f"El documento incluye:\n"
+                f"✓ Formato académico profesional\n"
+                f"✓ Estructura lista para índice automático\n"
+                f"✓ Referencias en formato APA\n"
+                f"✓ Configuración de página estándar")
+            
+        except Exception as e:
+            logger.warning(f"Error mostrando mensaje de éxito: {e}")
+            messagebox.showinfo("✅ Éxito", f"Documento generado: {filename}")
 

@@ -6,69 +6,196 @@ import customtkinter as ctk
 from tkinter import messagebox, filedialog
 import threading
 import os
+import sys
 from datetime import datetime
-from PIL import Image
-from core.state_manager import state_manager
-# Imports de módulos internos
+from pathlib import Path
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+# Imports de módulos internos corregidos
 from core.project_manager import ProjectManager
 from core.document_generator import DocumentGenerator
 from core.validator import ProjectValidator
-from modules.citations import CitationProcessor
-from modules.references import ReferenceManager
-from modules.sections import SectionManager
 
-# Imports de UI
-from .widgets import FontManager, ToolTip, PreviewWindow, ImageManagerDialog
-from .tabs import (
-    InfoGeneralTab, ContenidoDinamicoTab, CitasReferenciasTab,
-    FormatoAvanzadoTab, GeneracionTab
-)
-from .dialogs import SeccionDialog, HelpDialog
+# Imports de módulos con manejo de errores
+try:
+    from modules.citations import CitationProcessor
+except ImportError:
+    CitationProcessor = None
+    
+try:
+    from modules.references import ReferenceManager
+except ImportError:
+    ReferenceManager = None
+    
+try:
+    from modules.sections import SectionManager
+except ImportError:
+    SectionManager = None
+
+try:
+    from core.state_manager import state_manager
+except ImportError:
+    state_manager = None
+
+# Imports de UI con fallbacks
+try:
+    from .widgets import FontManager, ToolTip, PreviewWindow, ImageManagerDialog
+except ImportError:
+    from ui.widgets.font_manager import FontManager
+    ToolTip = None
+    PreviewWindow = None
+    ImageManagerDialog = None
+
+try:
+    from .tabs import (
+        InfoGeneralTab, ContenidoDinamicoTab, CitasReferenciasTab,
+        FormatoAvanzadoTab, GeneracionTab
+    )
+except ImportError:
+    # Fallback: crear pestañas básicas
+    InfoGeneralTab = None
+    ContenidoDinamicoTab = None
+    CitasReferenciasTab = None
+    FormatoAvanzadoTab = None
+    GeneracionTab = None
+
+try:
+    from .dialogs import SeccionDialog, HelpDialog
+except ImportError:
+    from ui.dialogs.help_dialog import HelpDialog
+    SeccionDialog = None
+
 from utils.logger import get_logger
+from config.settings import APP_CONFIG, DEFAULT_FORMAT, BUTTON_COLORS
+
 logger = get_logger('MainWindow')
 class ProyectoAcademicoGenerator:
-    """Clase principal del generador de proyectos académicos"""
+    """Clase principal del generador de proyectos académicos - Versión Optimizada"""
     
     def __init__(self):
-        self.root = ctk.CTk()
-        self.root.title("🎓 Generador de Proyectos Académicos - Versión Avanzada")
-        self.root.geometry("1200x700")
-        self.root.minsize(1000, 600)
-        
-        # MOVER _init_variables() ANTES de _init_state_manager()
-        self._init_variables()  # Mover esta línea aquí
-        self._init_managers()
-        self._init_state_manager()  # Ahora puede acceder a formato_config
-        self._init_ui_components()
-        
-        # Configurar ventana y UI
-        self.configurar_ventana_responsiva()
-        self.configurar_atajos_accesibilidad()
-        self.setup_ui()
-        self.setup_keyboard_shortcuts()
-        
-        # Iniciar servicios
-        self.mostrar_bienvenida()
-        self.actualizar_estadisticas()
-        self.project_manager.auto_save_project(self)
-    def _init_state_manager(self):
-        """Inicializa y configura el gestor de estado centralizado."""
-        from utils.logger import get_logger
-        logger = get_logger('MainWindow')
-        
-        # Cargar estado inicial
-        initial_state = {
-            'formato_config': self.formato_config,
-            'secciones_disponibles': self.secciones_disponibles,
-            'secciones_activas': self.secciones_activas
+        """Inicialización con manejo robusto de errores"""
+        try:
+            self.root = ctk.CTk()
+            self.root.title(f"🎓 {APP_CONFIG['name']} - v{APP_CONFIG['version']}")
+            self.root.geometry(APP_CONFIG['window_size'])
+            self.root.minsize(*APP_CONFIG['min_window_size'])
+            
+            # Inicialización ordenada con manejo de errores
+            self._init_variables()
+            self._init_managers() 
+            self._init_state_manager()
+            self._init_ui_components()
+            
+            # Configurar interfaz
+            self._setup_window()
+            self._setup_ui()
+            self._setup_keyboard_shortcuts()
+            
+            # Iniciar servicios
+            self._start_services()
+            
+            logger.info("Aplicación inicializada correctamente")
+            
+        except Exception as e:
+            logger.error(f"Error inicializando aplicación: {e}", exc_info=True)
+            messagebox.showerror("Error de Inicialización", 
+                f"Error al inicializar la aplicación:\n{str(e)}")
+            raise
+    def _start_services(self):
+        """Inicia servicios de la aplicación"""
+        try:
+            # Actualizar estadísticas cada 5 segundos
+            self._actualizar_estadisticas()
+            
+            # Auto-guardado cada 5 minutos si está disponible
+            if hasattr(self.project_manager, 'auto_save_project'):
+                self.root.after(300000, lambda: self.project_manager.auto_save_project(self))
+            
+            # Mostrar mensaje de bienvenida
+            self.root.after(1000, self._mostrar_bienvenida)
+            
+        except Exception as e:
+            logger.warning(f"Error iniciando servicios: {e}")
+    def _setup_keyboard_shortcuts(self):
+        """Configura atajos de teclado esenciales"""
+        shortcuts = {
+            '<Control-s>': lambda e: self._guardar_proyecto(),
+            '<Control-o>': lambda e: self._cargar_proyecto(),
+            '<Control-n>': lambda e: self._nuevo_proyecto(),
+            '<F5>': lambda e: self._validar_proyecto(),
+            '<F9>': lambda e: self._generar_documento(),
+            '<F1>': lambda e: self._mostrar_ayuda(),
+            '<Control-q>': lambda e: self.root.quit()
         }
         
-        state_manager.update_state(**initial_state)
+        for key, func in shortcuts.items():
+            self.root.bind(key, func)
+    def _setup_ui(self):
+        """Configura la interfaz de usuario"""
+        try:
+            # Frame principal
+            main_container = ctk.CTkFrame(self.root, corner_radius=0)
+            main_container.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            # Header
+            self._create_header(main_container)
+            
+            # Content container
+            content_container = ctk.CTkFrame(main_container, corner_radius=10)
+            content_container.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+            
+            # Tabview principal
+            self.tabview = ctk.CTkTabview(content_container, width=1100, height=520)
+            self.tabview.pack(expand=True, fill="both", padx=10, pady=10)
+            
+            # Crear pestañas
+            self._create_tabs()
+            
+            logger.info("Interfaz de usuario configurada")
+            
+        except Exception as e:
+            logger.error(f"Error configurando UI: {e}")
+            messagebox.showerror("Error de UI", f"Error configurando interfaz: {str(e)}")
+    def _setup_window(self):
+        """Configura la ventana principal"""
+        # Configuración responsiva
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
         
-        # Suscribir a cambios de estado
-        state_manager.subscribe(self._on_state_change)
+        window_width = max(1000, min(int(screen_width * 0.8), 1600))
+        window_height = max(600, min(int(screen_height * 0.8), 900))
         
-        logger.info("StateManager integrado")
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Ajustar modo según tamaño de pantalla
+        if screen_width < 1366:
+            self.modo_compacto = True
+            self._ajustar_modo_compacto()
+        elif screen_width > 1920:
+            self.modo_expandido = True
+            self._ajustar_modo_expandido()
+    def _init_state_manager(self):
+        """Inicializa el gestor de estado si está disponible"""
+        if state_manager:
+            try:
+                initial_state = {
+                    'formato_config': self.formato_config,
+                    'secciones_disponibles': self.secciones_disponibles,
+                    'secciones_activas': self.secciones_activas,
+                    'referencias': self.referencias
+                }
+                state_manager.update_state(**initial_state)
+                state_manager.subscribe(self._on_state_change)
+                logger.info("StateManager integrado correctamente")
+            except Exception as e:
+                logger.warning(f"Error integrando StateManager: {e}")
 
     def _on_state_change(self, new_state):
         """Callback cuando cambia el estado global."""
@@ -76,25 +203,40 @@ class ProyectoAcademicoGenerator:
         # Por ejemplo, actualizar estadísticas
         self.actualizar_estadisticas()
     def _init_managers(self):
-        """Inicializa los gestores y procesadores"""
-        from template_manager import obtener_template_manager
-        
-        self.template_manager = obtener_template_manager()
-        self.project_manager = ProjectManager()
-        self.document_generator = DocumentGenerator()
-        self.validator = ProjectValidator()
-        self.citation_processor = CitationProcessor()
-        self.reference_manager = ReferenceManager()
-        self.section_manager = SectionManager()
-        self.font_manager = FontManager()
+        """Inicializa los gestores con manejo de errores"""
+        try:
+            self.project_manager = ProjectManager()
+            self.document_generator = DocumentGenerator()
+            self.validator = ProjectValidator()
+            self.font_manager = FontManager()
+            
+            # Gestores opcionales
+            self.citation_processor = CitationProcessor() if CitationProcessor else None
+            self.reference_manager = ReferenceManager() if ReferenceManager else None
+            self.section_manager = SectionManager() if SectionManager else None
+            
+            # Template manager con fallback
+            try:
+                from template_manager import obtener_template_manager
+                self.template_manager = obtener_template_manager()
+            except ImportError:
+                self.template_manager = None
+                logger.warning("Template manager no disponible")
+                
+        except Exception as e:
+            logger.error(f"Error inicializando gestores: {e}")
+            # Continuar con gestores básicos
+            self.project_manager = ProjectManager()
+            self.document_generator = DocumentGenerator()
+            self.validator = ProjectValidator()
+            self.font_manager = FontManager()
     
     def _init_variables(self):
-        """Inicializa las variables de la aplicación"""
+        """Inicializa todas las variables necesarias"""
         # Datos del proyecto
         self.proyecto_data = {}
         self.referencias = []
-        self.documento_base = None
-        self.usar_formato_base = False
+        self.content_texts = {}
         
         # Variables para imágenes
         self.encabezado_personalizado = None
@@ -108,21 +250,11 @@ class ProyectoAcademicoGenerator:
         self.watermark_mode = 'watermark'
         
         # Secciones dinámicas
-        self.secciones_disponibles = self.get_secciones_iniciales()
+        self.secciones_disponibles = self._get_secciones_iniciales()
         self.secciones_activas = list(self.secciones_disponibles.keys())
-        self.content_texts = {}
         
-        # Configuración de formato
-        self.formato_config = {
-            'fuente_texto': 'Times New Roman',
-            'tamaño_texto': 12,
-            'fuente_titulo': 'Times New Roman', 
-            'tamaño_titulo': 14,
-            'interlineado': 2.0,
-            'margen': 2.54,
-            'justificado': True,
-            'sangria': True
-        }
+        # Configuración de formato desde settings
+        self.formato_config = DEFAULT_FORMAT.copy()
         
         # Estadísticas
         self.stats = {
@@ -132,14 +264,34 @@ class ProyectoAcademicoGenerator:
             'references_added': 0
         }
         
+        # Variables de UI
+        self.modo_compacto = False
+        self.modo_expandido = False
+        self.sidebar_collapsed = False
+        
         # Buscar imágenes base
-        self.buscar_imagenes_base()
+        self._buscar_imagenes_base()
     
     def _init_ui_components(self):
-        """Inicializa componentes de UI"""
-        self.preview_window = PreviewWindow(self)
-        self.image_manager = ImageManagerDialog(self)
-        self.help_dialog = HelpDialog(self)
+        """Inicializa componentes de UI con fallbacks"""
+        try:
+            if PreviewWindow:
+                self.preview_window = PreviewWindow(self)
+            else:
+                self.preview_window = None
+                
+            if ImageManagerDialog:
+                self.image_manager = ImageManagerDialog(self)
+            else:
+                self.image_manager = None
+                
+            if HelpDialog:
+                self.help_dialog = HelpDialog(self)
+            else:
+                self.help_dialog = None
+                
+        except Exception as e:
+            logger.warning(f"Error inicializando componentes UI: {e}")
     
     def configurar_ventana_responsiva(self):
         """Configura la ventana según el tamaño de pantalla"""
@@ -232,21 +384,25 @@ class ProyectoAcademicoGenerator:
         self.root.after(1000, self.agregar_tooltips)
     
     def _create_header(self, parent):
-        """Crea el header con título y botones principales"""
-        header_frame = ctk.CTkFrame(parent, height=120, corner_radius=10)
-        header_frame.pack(fill="x", padx=10, pady=(10, 5))
-        header_frame.pack_propagate(False)
-        
-        # Título
-        self.title_label = ctk.CTkLabel(
-            header_frame, 
-            text="🎓 Generador de Proyectos Académicos",
-            font=self.font_manager.get_font("title", "bold")
-        )
-        self.title_label.pack(pady=(10, 5))
-        
-        # Botones principales
-        self._create_header_buttons(header_frame)
+        """Crea el header con manejo de errores mejorado"""
+        try:
+            header_frame = ctk.CTkFrame(parent, height=120, corner_radius=10)
+            header_frame.pack(fill="x", padx=10, pady=(10, 5))
+            header_frame.pack_propagate(False)
+            
+            # Título
+            self.title_label = ctk.CTkLabel(
+                header_frame, 
+                text=f"🎓 {APP_CONFIG['name']}",
+                font=self.font_manager.get_font("title", "bold")
+            )
+            self.title_label.pack(pady=(10, 5))
+            
+            # Botones principales
+            self._create_header_buttons(header_frame)
+            
+        except Exception as e:
+            logger.error(f"Error creando header: {e}")
     
     def _create_header_buttons(self, parent):
             """Crea los botones del header"""
@@ -327,27 +483,79 @@ class ProyectoAcademicoGenerator:
             self.plantillas_btn = btn_row2.winfo_children()[3]
     
     def _create_tabs(self):
-        """Crea las pestañas principales"""
-        # Información General
-        tab1 = self.tabview.add("📋 Información General")
-        self.info_general_tab = InfoGeneralTab(tab1, self)
-        
-        # Contenido Dinámico
-        tab2 = self.tabview.add("📝 Contenido Dinámico")
-        self.contenido_dinamico_tab = ContenidoDinamicoTab(tab2, self)
-        
-        # Citas y Referencias
-        tab3 = self.tabview.add("📚 Citas y Referencias")
-        self.citas_referencias_tab = CitasReferenciasTab(tab3, self)
-        
-        # Formato Avanzado
-        tab4 = self.tabview.add("🎨 Formato")
-        self.formato_avanzado_tab = FormatoAvanzadoTab(tab4, self)
-        
-        # Generación
-        tab5 = self.tabview.add("🔧 Generar")
-        self.generacion_tab = GeneracionTab(tab5, self)
+        """Crea las pestañas principales con fallbacks"""
+        try:
+            # Información General
+            tab1 = self.tabview.add("📋 Información General")
+            if InfoGeneralTab:
+                self.info_general_tab = InfoGeneralTab(tab1, self)
+            else:
+                self._create_basic_info_tab(tab1)
+            
+            # Contenido Dinámico  
+            tab2 = self.tabview.add("📝 Contenido")
+            if ContenidoDinamicoTab:
+                self.contenido_dinamico_tab = ContenidoDinamicoTab(tab2, self)
+            else:
+                self._create_basic_content_tab(tab2)
+            
+            # Referencias
+            tab3 = self.tabview.add("📚 Referencias")
+            if CitasReferenciasTab:
+                self.citas_referencias_tab = CitasReferenciasTab(tab3, self)
+            else:
+                self._create_basic_references_tab(tab3)
+            
+            # Formato
+            tab4 = self.tabview.add("🎨 Formato")
+            if FormatoAvanzadoTab:
+                self.formato_avanzado_tab = FormatoAvanzadoTab(tab4, self)
+            else:
+                self._create_basic_format_tab(tab4)
+            
+            # Generación
+            tab5 = self.tabview.add("🔧 Generar")
+            if GeneracionTab:
+                self.generacion_tab = GeneracionTab(tab5, self)
+            else:
+                self._create_basic_generation_tab(tab5)
+                
+        except Exception as e:
+            logger.error(f"Error creando pestañas: {e}")
+    def _create_basic_info_tab(self, parent):
+        """Crea pestaña básica de información"""
+        label = ctk.CTkLabel(parent, text="Pestaña de información en desarrollo")
+        label.pack(pady=20)
     
+    def _create_basic_content_tab(self, parent):
+        """Crea pestaña básica de contenido"""
+        label = ctk.CTkLabel(parent, text="Pestaña de contenido en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_references_tab(self, parent):
+        """Crea pestaña básica de referencias"""
+        label = ctk.CTkLabel(parent, text="Pestaña de referencias en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_format_tab(self, parent):
+        """Crea pestaña básica de formato"""
+        label = ctk.CTkLabel(parent, text="Pestaña de formato en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_generation_tab(self, parent):
+        """Crea pestaña básica de generación"""
+        # Crear area de validación básica
+        self.validation_text = ctk.CTkTextbox(parent, height=300)
+        self.validation_text.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Mensaje inicial
+        self.validation_text.insert("1.0", 
+            "🔧 PANEL DE GENERACIÓN\n\n"
+            "Usa los botones del header para:\n"
+            "• 🔍 Validar: Revisar el proyecto\n"
+            "• 📄 Generar: Crear documento Word\n\n"
+            "Funcionalidad completa disponible al instalar todos los módulos."
+        )
     def _create_accessibility_menu(self, parent):
         """Crea el menú de accesibilidad"""
         # Frame de accesibilidad en el header
@@ -381,7 +589,17 @@ class ProyectoAcademicoGenerator:
         self.actualizar_indicador_zoom = lambda: self.zoom_label.configure(
             text=f"🔍 {int(self.font_manager.get_current_scale() * 100)}%"
         ) if hasattr(self, 'zoom_label') else None
+    def _ajustar_modo_compacto(self):
+        """Ajusta la interfaz para pantallas pequeñas"""
+        self.padding_x = 5
+        self.padding_y = 5
+        self.font_manager.scale = 0.9
     
+    def _ajustar_modo_expandido(self):
+        """Ajusta la interfaz para pantallas grandes"""
+        self.padding_x = 20
+        self.padding_y = 15
+        self.font_manager.scale = 1.1
     def setup_keyboard_shortcuts(self):
         """Versión actualizada con undo/redo"""
         shortcuts = {
@@ -1834,9 +2052,685 @@ class ProyectoAcademicoGenerator:
     def contenido_guardado(self, value):
         """Setter para contenido_guardado"""
         self._contenido_guardado = value
+"""
+Ventana principal - Coordinador principal de la aplicación
+Versión optimizada y corregida
+"""
+
+import customtkinter as ctk
+from tkinter import messagebox, filedialog
+import threading
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+
+try:
+    from PIL import Image
+except ImportError:
+    Image = None
+
+# Imports de módulos internos corregidos
+from core.project_manager import ProjectManager
+from core.document_generator import DocumentGenerator
+from core.validator import ProjectValidator
+
+# Imports de módulos con manejo de errores
+try:
+    from modules.citations import CitationProcessor
+except ImportError:
+    CitationProcessor = None
+    
+try:
+    from modules.references import ReferenceManager
+except ImportError:
+    ReferenceManager = None
+    
+try:
+    from modules.sections import SectionManager
+except ImportError:
+    SectionManager = None
+
+try:
+    from core.state_manager import state_manager
+except ImportError:
+    state_manager = None
+
+# Imports de UI con fallbacks
+try:
+    from .widgets import FontManager, ToolTip, PreviewWindow, ImageManagerDialog
+except ImportError:
+    from ui.widgets.font_manager import FontManager
+    ToolTip = None
+    PreviewWindow = None
+    ImageManagerDialog = None
+
+try:
+    from .tabs import (
+        InfoGeneralTab, ContenidoDinamicoTab, CitasReferenciasTab,
+        FormatoAvanzadoTab, GeneracionTab
+    )
+except ImportError:
+    # Fallback: crear pestañas básicas
+    InfoGeneralTab = None
+    ContenidoDinamicoTab = None
+    CitasReferenciasTab = None
+    FormatoAvanzadoTab = None
+    GeneracionTab = None
+
+try:
+    from .dialogs import SeccionDialog, HelpDialog
+except ImportError:
+    from ui.dialogs.help_dialog import HelpDialog
+    SeccionDialog = None
+
+from utils.logger import get_logger
+from config.settings import APP_CONFIG, DEFAULT_FORMAT, BUTTON_COLORS
+
+logger = get_logger('MainWindow')
+
+class ProyectoAcademicoGenerator:
+    """Clase principal del generador de proyectos académicos - Versión Optimizada"""
+    
+    def __init__(self):
+        """Inicialización con manejo robusto de errores"""
+        try:
+            self.root = ctk.CTk()
+            self.root.title(f"🎓 {APP_CONFIG['name']} - v{APP_CONFIG['version']}")
+            self.root.geometry(APP_CONFIG['window_size'])
+            self.root.minsize(*APP_CONFIG['min_window_size'])
+            
+            # Inicialización ordenada con manejo de errores
+            self._init_variables()
+            self._init_managers() 
+            self._init_state_manager()
+            self._init_ui_components()
+            
+            # Configurar interfaz
+            self._setup_window()
+            self._setup_ui()
+            self._setup_keyboard_shortcuts()
+            
+            # Iniciar servicios
+            self._start_services()
+            
+            logger.info("Aplicación inicializada correctamente")
+            
+        except Exception as e:
+            logger.error(f"Error inicializando aplicación: {e}", exc_info=True)
+            messagebox.showerror("Error de Inicialización", 
+                f"Error al inicializar la aplicación:\n{str(e)}")
+            raise
+    
+    def _init_variables(self):
+        """Inicializa todas las variables necesarias"""
+        # Datos del proyecto
+        self.proyecto_data = {}
+        self.referencias = []
+        self.content_texts = {}
+        
+        # Variables para imágenes
+        self.encabezado_personalizado = None
+        self.insignia_personalizada = None
+        self.ruta_encabezado = None
+        self.ruta_insignia = None
+        
+        # Configuración de marca de agua
+        self.watermark_opacity = 0.3
+        self.watermark_stretch = True
+        self.watermark_mode = 'watermark'
+        
+        # Secciones dinámicas
+        self.secciones_disponibles = self._get_secciones_iniciales()
+        self.secciones_activas = list(self.secciones_disponibles.keys())
+        
+        # Configuración de formato desde settings
+        self.formato_config = DEFAULT_FORMAT.copy()
+        
+        # Estadísticas
+        self.stats = {
+            'total_words': 0,
+            'total_chars': 0,
+            'sections_completed': 0,
+            'references_added': 0
+        }
+        
+        # Variables de UI
+        self.modo_compacto = False
+        self.modo_expandido = False
+        self.sidebar_collapsed = False
+        
+        # Buscar imágenes base
+        self._buscar_imagenes_base()
+    
+    def _init_managers(self):
+        """Inicializa los gestores con manejo de errores"""
+        try:
+            self.project_manager = ProjectManager()
+            self.document_generator = DocumentGenerator()
+            self.validator = ProjectValidator()
+            self.font_manager = FontManager()
+            
+            # Gestores opcionales
+            self.citation_processor = CitationProcessor() if CitationProcessor else None
+            self.reference_manager = ReferenceManager() if ReferenceManager else None
+            self.section_manager = SectionManager() if SectionManager else None
+            
+            # Template manager con fallback
+            try:
+                from template_manager import obtener_template_manager
+                self.template_manager = obtener_template_manager()
+            except ImportError:
+                self.template_manager = None
+                logger.warning("Template manager no disponible")
+                
+        except Exception as e:
+            logger.error(f"Error inicializando gestores: {e}")
+            # Continuar con gestores básicos
+            self.project_manager = ProjectManager()
+            self.document_generator = DocumentGenerator()
+            self.validator = ProjectValidator()
+            self.font_manager = FontManager()
+    
+    def _init_state_manager(self):
+        """Inicializa el gestor de estado si está disponible"""
+        if state_manager:
+            try:
+                initial_state = {
+                    'formato_config': self.formato_config,
+                    'secciones_disponibles': self.secciones_disponibles,
+                    'secciones_activas': self.secciones_activas,
+                    'referencias': self.referencias
+                }
+                state_manager.update_state(**initial_state)
+                state_manager.subscribe(self._on_state_change)
+                logger.info("StateManager integrado correctamente")
+            except Exception as e:
+                logger.warning(f"Error integrando StateManager: {e}")
+    
+    def _init_ui_components(self):
+        """Inicializa componentes de UI con fallbacks"""
+        try:
+            if PreviewWindow:
+                self.preview_window = PreviewWindow(self)
+            else:
+                self.preview_window = None
+                
+            if ImageManagerDialog:
+                self.image_manager = ImageManagerDialog(self)
+            else:
+                self.image_manager = None
+                
+            if HelpDialog:
+                self.help_dialog = HelpDialog(self)
+            else:
+                self.help_dialog = None
+                
+        except Exception as e:
+            logger.warning(f"Error inicializando componentes UI: {e}")
+    
+    def _setup_window(self):
+        """Configura la ventana principal"""
+        # Configuración responsiva
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        window_width = max(1000, min(int(screen_width * 0.8), 1600))
+        window_height = max(600, min(int(screen_height * 0.8), 900))
+        
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        
+        # Ajustar modo según tamaño de pantalla
+        if screen_width < 1366:
+            self.modo_compacto = True
+            self._ajustar_modo_compacto()
+        elif screen_width > 1920:
+            self.modo_expandido = True
+            self._ajustar_modo_expandido()
+    
+    def _ajustar_modo_compacto(self):
+        """Ajusta la interfaz para pantallas pequeñas"""
+        self.padding_x = 5
+        self.padding_y = 5
+        self.font_manager.scale = 0.9
+    
+    def _ajustar_modo_expandido(self):
+        """Ajusta la interfaz para pantallas grandes"""
+        self.padding_x = 20
+        self.padding_y = 15
+        self.font_manager.scale = 1.1
+    
+    def _setup_ui(self):
+        """Configura la interfaz de usuario"""
+        try:
+            # Frame principal
+            main_container = ctk.CTkFrame(self.root, corner_radius=0)
+            main_container.pack(fill="both", expand=True, padx=10, pady=10)
+            
+            # Header
+            self._create_header(main_container)
+            
+            # Content container
+            content_container = ctk.CTkFrame(main_container, corner_radius=10)
+            content_container.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+            
+            # Tabview principal
+            self.tabview = ctk.CTkTabview(content_container, width=1100, height=520)
+            self.tabview.pack(expand=True, fill="both", padx=10, pady=10)
+            
+            # Crear pestañas
+            self._create_tabs()
+            
+            logger.info("Interfaz de usuario configurada")
+            
+        except Exception as e:
+            logger.error(f"Error configurando UI: {e}")
+            messagebox.showerror("Error de UI", f"Error configurando interfaz: {str(e)}")
+    
+    def _create_header(self, parent):
+        """Crea el header con manejo de errores mejorado"""
+        try:
+            header_frame = ctk.CTkFrame(parent, height=120, corner_radius=10)
+            header_frame.pack(fill="x", padx=10, pady=(10, 5))
+            header_frame.pack_propagate(False)
+            
+            # Título
+            self.title_label = ctk.CTkLabel(
+                header_frame, 
+                text=f"🎓 {APP_CONFIG['name']}",
+                font=self.font_manager.get_font("title", "bold")
+            )
+            self.title_label.pack(pady=(10, 5))
+            
+            # Botones principales
+            self._create_header_buttons(header_frame)
+            
+        except Exception as e:
+            logger.error(f"Error creando header: {e}")
+    
+    def _create_header_buttons(self, parent):
+        """Crea los botones del header con colores corregidos"""
+        try:
+            button_frame = ctk.CTkFrame(parent, fg_color="transparent")
+            button_frame.pack(fill="x", padx=20, pady=(5, 10))
+            
+            # Primera fila de botones
+            btn_row1 = ctk.CTkFrame(button_frame, fg_color="transparent")
+            btn_row1.pack(fill="x", pady=(0, 5))
+            
+            # Definir botones con colores seguros
+            buttons_row1 = [
+                ("📖 Guía", self._mostrar_ayuda, None, None, 80),
+                ("💾 Guardar", self._guardar_proyecto, "#228B22", "#006400", 80),
+                ("📂 Cargar", self._cargar_proyecto, "#4682B4", "#191970", 80),
+                ("🔍 Validar", self._validar_proyecto, "#FF8C00", "#FF6347", 80)
+            ]
+            
+            self.header_buttons = {}
+            
+            for text, command, fg_color, hover_color, width in buttons_row1:
+                btn = ctk.CTkButton(
+                    btn_row1, text=text, command=command,
+                    width=width, height=30, 
+                    font=self.font_manager.get_font("small", "bold"),
+                    fg_color=fg_color,
+                    hover_color=hover_color
+                )
+                btn.pack(side="left", padx=(0, 5))
+                self.header_buttons[text] = btn
+            
+            # Estadísticas
+            self.stats_label = ctk.CTkLabel(
+                btn_row1, 
+                text="📊 Palabras: 0 | Secciones: 0/13 | Referencias: 0",
+                font=self.font_manager.get_font("small"), 
+                text_color="gray70"
+            )
+            self.stats_label.pack(side="right", padx=(5, 0))
+            
+            # Segunda fila
+            btn_row2 = ctk.CTkFrame(button_frame, fg_color="transparent")
+            btn_row2.pack(fill="x")
+            
+            # Botón generar prominente
+            self.generate_btn = ctk.CTkButton(
+                btn_row2, text="📄 Generar Documento", 
+                command=self._generar_documento,
+                width=160, height=35, 
+                font=self.font_manager.get_font("medium", "bold"),
+                fg_color="#228B22", 
+                hover_color="#006400"
+            )
+            self.generate_btn.pack(side="right", padx=(5, 0))
+            
+        except Exception as e:
+            logger.error(f"Error creando botones del header: {e}")
+    
+    def _create_tabs(self):
+        """Crea las pestañas principales con fallbacks"""
+        try:
+            # Información General
+            tab1 = self.tabview.add("📋 Información General")
+            if InfoGeneralTab:
+                self.info_general_tab = InfoGeneralTab(tab1, self)
+            else:
+                self._create_basic_info_tab(tab1)
+            
+            # Contenido Dinámico  
+            tab2 = self.tabview.add("📝 Contenido")
+            if ContenidoDinamicoTab:
+                self.contenido_dinamico_tab = ContenidoDinamicoTab(tab2, self)
+            else:
+                self._create_basic_content_tab(tab2)
+            
+            # Referencias
+            tab3 = self.tabview.add("📚 Referencias")
+            if CitasReferenciasTab:
+                self.citas_referencias_tab = CitasReferenciasTab(tab3, self)
+            else:
+                self._create_basic_references_tab(tab3)
+            
+            # Formato
+            tab4 = self.tabview.add("🎨 Formato")
+            if FormatoAvanzadoTab:
+                self.formato_avanzado_tab = FormatoAvanzadoTab(tab4, self)
+            else:
+                self._create_basic_format_tab(tab4)
+            
+            # Generación
+            tab5 = self.tabview.add("🔧 Generar")
+            if GeneracionTab:
+                self.generacion_tab = GeneracionTab(tab5, self)
+            else:
+                self._create_basic_generation_tab(tab5)
+                
+        except Exception as e:
+            logger.error(f"Error creando pestañas: {e}")
+    
+    def _create_basic_info_tab(self, parent):
+        """Crea pestaña básica de información"""
+        label = ctk.CTkLabel(parent, text="Pestaña de información en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_content_tab(self, parent):
+        """Crea pestaña básica de contenido"""
+        label = ctk.CTkLabel(parent, text="Pestaña de contenido en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_references_tab(self, parent):
+        """Crea pestaña básica de referencias"""
+        label = ctk.CTkLabel(parent, text="Pestaña de referencias en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_format_tab(self, parent):
+        """Crea pestaña básica de formato"""
+        label = ctk.CTkLabel(parent, text="Pestaña de formato en desarrollo")
+        label.pack(pady=20)
+    
+    def _create_basic_generation_tab(self, parent):
+        """Crea pestaña básica de generación"""
+        # Crear area de validación básica
+        self.validation_text = ctk.CTkTextbox(parent, height=300)
+        self.validation_text.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Mensaje inicial
+        self.validation_text.insert("1.0", 
+            "🔧 PANEL DE GENERACIÓN\n\n"
+            "Usa los botones del header para:\n"
+            "• 🔍 Validar: Revisar el proyecto\n"
+            "• 📄 Generar: Crear documento Word\n\n"
+            "Funcionalidad completa disponible al instalar todos los módulos."
+        )
+    
+    def _setup_keyboard_shortcuts(self):
+        """Configura atajos de teclado esenciales"""
+        shortcuts = {
+            '<Control-s>': lambda e: self._guardar_proyecto(),
+            '<Control-o>': lambda e: self._cargar_proyecto(),
+            '<Control-n>': lambda e: self._nuevo_proyecto(),
+            '<F5>': lambda e: self._validar_proyecto(),
+            '<F9>': lambda e: self._generar_documento(),
+            '<F1>': lambda e: self._mostrar_ayuda(),
+            '<Control-q>': lambda e: self.root.quit()
+        }
+        
+        for key, func in shortcuts.items():
+            self.root.bind(key, func)
+    
+    def _start_services(self):
+        """Inicia servicios de la aplicación"""
+        try:
+            # Actualizar estadísticas cada 5 segundos
+            self._actualizar_estadisticas()
+            
+            # Auto-guardado cada 5 minutos si está disponible
+            if hasattr(self.project_manager, 'auto_save_project'):
+                self.root.after(300000, lambda: self.project_manager.auto_save_project(self))
+            
+            # Mostrar mensaje de bienvenida
+            self.root.after(1000, self._mostrar_bienvenida)
+            
+        except Exception as e:
+            logger.warning(f"Error iniciando servicios: {e}")
+    
+    # ==================== MÉTODOS PRINCIPALES ====================
+    
+    def _guardar_proyecto(self):
+        """Guarda el proyecto con manejo de errores"""
+        try:
+            self.project_manager.guardar_proyecto(self)
+        except Exception as e:
+            logger.error(f"Error guardando proyecto: {e}")
+            messagebox.showerror("Error", f"Error al guardar: {str(e)}")
+    
+    def _cargar_proyecto(self):
+        """Carga un proyecto con manejo de errores"""
+        try:
+            self.project_manager.cargar_proyecto(self)
+        except Exception as e:
+            logger.error(f"Error cargando proyecto: {e}")
+            messagebox.showerror("Error", f"Error al cargar: {str(e)}")
+    
+    def _nuevo_proyecto(self):
+        """Crea un nuevo proyecto"""
+        try:
+            respuesta = messagebox.askyesno("Nuevo Proyecto", 
+                "¿Crear un nuevo proyecto? Se perderán los cambios no guardados.")
+            if respuesta:
+                self.__init__()
+        except Exception as e:
+            logger.error(f"Error creando nuevo proyecto: {e}")
+    
+    def _validar_proyecto(self):
+        """Valida el proyecto actual"""
+        try:
+            self.validator.validar_proyecto(self)
+        except Exception as e:
+            logger.error(f"Error validando proyecto: {e}")
+            if hasattr(self, 'validation_text'):
+                self.validation_text.delete("1.0", "end")
+                self.validation_text.insert("1.0", f"❌ Error en validación: {str(e)}")
+    
+    def _generar_documento(self):
+        """Genera el documento Word"""
+        try:
+            self.document_generator.generar_documento_async(self)
+        except Exception as e:
+            logger.error(f"Error generando documento: {e}")
+            messagebox.showerror("Error", f"Error al generar documento: {str(e)}")
+    
+    def _mostrar_ayuda(self):
+        """Muestra la ayuda"""
+        try:
+            if self.help_dialog:
+                self.help_dialog.show()
+            else:
+                messagebox.showinfo("Ayuda", 
+                    f"{APP_CONFIG['name']} v{APP_CONFIG['version']}\n\n"
+                    "Atajos de teclado:\n"
+                    "• Ctrl+S: Guardar\n"
+                    "• Ctrl+O: Cargar\n"
+                    "• F5: Validar\n"
+                    "• F9: Generar\n"
+                    "• F1: Ayuda")
+        except Exception as e:
+            logger.error(f"Error mostrando ayuda: {e}")
+    
+    # ==================== MÉTODOS DE UTILIDAD ====================
+    
+    def _buscar_imagenes_base(self):
+        """Busca imágenes base en recursos"""
+        try:
+            script_dir = Path(__file__).parent.parent
+            recursos_dir = script_dir / "resources" / "images"
+            
+            if not recursos_dir.exists():
+                recursos_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Buscar encabezado
+            for ext in ['png', 'jpg', 'jpeg']:
+                encabezado_path = recursos_dir / f"Encabezado.{ext}"
+                if encabezado_path.exists():
+                    self.ruta_encabezado = str(encabezado_path)
+                    break
+            
+            # Buscar insignia
+            for ext in ['png', 'jpg', 'jpeg']:
+                insignia_path = recursos_dir / f"Insignia.{ext}"
+                if insignia_path.exists():
+                    self.ruta_insignia = str(insignia_path)
+                    break
+                    
+        except Exception as e:
+            logger.warning(f"Error buscando imágenes: {e}")
+    
+    def _get_secciones_iniciales(self):
+        """Define las secciones disponibles"""
+        return {
+            "resumen": {
+                "titulo": "📄 Resumen", 
+                "instruccion": "Resumen ejecutivo del proyecto (150-300 palabras)",
+                "requerida": False,
+                "capitulo": False
+            },
+            "introduccion": {
+                "titulo": "🔍 Introducción", 
+                "instruccion": "Presenta el tema, contexto e importancia",
+                "requerida": True,
+                "capitulo": False
+            },
+            "objetivos": {
+                "titulo": "🎯 Objetivos", 
+                "instruccion": "General y específicos (verbos en infinitivo)",
+                "requerida": True,
+                "capitulo": False
+            },
+            "metodologia": {
+                "titulo": "⚙️ Marco Metodológico", 
+                "instruccion": "Tipo de estudio y técnicas de recolección",
+                "requerida": True,
+                "capitulo": False
+            },
+            "desarrollo": {
+                "titulo": "⚙️ Desarrollo", 
+                "instruccion": "Proceso de investigación paso a paso",
+                "requerida": False,
+                "capitulo": False
+            },
+            "conclusiones": {
+                "titulo": "✅ Conclusiones", 
+                "instruccion": "Hallazgos principales y respuestas a objetivos",
+                "requerida": True,
+                "capitulo": False
+            }
+        }
+    
+    def _actualizar_estadisticas(self):
+        """Actualiza estadísticas en tiempo real"""
+        try:
+            total_words = 0
+            sections_completed = 0
+            
+            # Contar desde content_texts si existe
+            for key, text_widget in self.content_texts.items():
+                try:
+                    content = text_widget.get("1.0", "end").strip()
+                    if content and len(content) > 10:
+                        sections_completed += 1
+                        total_words += len(content.split())
+                except:
+                    continue
+            
+            self.stats = {
+                'total_words': total_words,
+                'sections_completed': sections_completed,
+                'references_added': len(self.referencias)
+            }
+            
+            # Actualizar label si existe
+            if hasattr(self, 'stats_label'):
+                total_sections = len(self.secciones_disponibles)
+                stats_text = f"📊 Palabras: {total_words} | Secciones: {sections_completed}/{total_sections} | Referencias: {len(self.referencias)}"
+                self.stats_label.configure(text=stats_text)
+            
+            # Programar próxima actualización
+            self.root.after(5000, self._actualizar_estadisticas)
+            
+        except Exception as e:
+            logger.warning(f"Error actualizando estadísticas: {e}")
+    
+    def _mostrar_bienvenida(self):
+        """Muestra mensaje de bienvenida"""
+        try:
+            messagebox.showinfo(
+                f"🎓 {APP_CONFIG['name']}",
+                f"Bienvenido al {APP_CONFIG['name']} v{APP_CONFIG['version']}\n\n"
+                "🚀 CARACTERÍSTICAS:\n"
+                "• Generación profesional de documentos\n"
+                "• Sistema modular y escalable\n"
+                "• Auto-guardado y validación\n"
+                "• Interfaz responsiva\n\n"
+                "⌨️ ATAJOS:\n"
+                "• F1: Ayuda\n"
+                "• F5: Validar\n" 
+                "• F9: Generar\n"
+                "• Ctrl+S: Guardar\n\n"
+                "¡Comienza creando tu proyecto académico!"
+            )
+        except Exception as e:
+            logger.warning(f"Error mostrando bienvenida: {e}")
+    
+    def _on_state_change(self, new_state):
+        """Callback para cambios de estado"""
+        try:
+            if hasattr(new_state, 'referencias'):
+                self.referencias = new_state.referencias
+            self._actualizar_estadisticas()
+        except Exception as e:
+            logger.warning(f"Error procesando cambio de estado: {e}")
+    
     def run(self):
-        """Ejecuta la aplicación"""
-        self.root.mainloop()
+        """Ejecuta la aplicación con manejo de errores"""
+        try:
+            logger.info("Iniciando interfaz principal")
+            self.root.mainloop()
+        except Exception as e:
+            logger.error(f"Error ejecutando aplicación: {e}", exc_info=True)
+            raise
+        finally:
+            logger.info("Aplicación cerrada")
+
+# Métodos adicionales para compatibilidad
+    def actualizar_estadisticas(self):
+        """Método de compatibilidad"""
+        return self._actualizar_estadisticas()
+
+    def generar_documento_async(self):
+        """Método de compatibilidad"""
+        return self._generar_documento()
 
 # Incluir aquí todos los métodos restantes necesarios que no se han movido a módulos separados
 # [Agregar métodos como actualizar_lista_secciones, crear_pestanas_contenido, etc.]
