@@ -24,7 +24,8 @@ from .tabs import (
     FormatoAvanzadoTab, GeneracionTab
 )
 from .dialogs import SeccionDialog, HelpDialog
-
+from utils.logger import get_logger
+logger = get_logger('MainWindow')
 class ProyectoAcademicoGenerator:
     """Clase principal del generador de proyectos académicos"""
     
@@ -382,7 +383,7 @@ class ProyectoAcademicoGenerator:
         ) if hasattr(self, 'zoom_label') else None
     
     def setup_keyboard_shortcuts(self):
-        """Versión actualizada con undo/redo."""
+        """Versión actualizada con undo/redo"""
         shortcuts = {
             '<Control-s>': lambda e: self.guardar_proyecto(),
             '<Control-o>': lambda e: self.cargar_proyecto(),
@@ -399,19 +400,19 @@ class ProyectoAcademicoGenerator:
             self.root.bind(key, func)
 
     def undo(self):
-        """Deshace la última acción."""
+        """Deshace la última acción"""
         state_manager.undo()
         self._sincronizar_con_estado()
         messagebox.showinfo("↩️ Deshacer", "Acción deshecha")
 
     def redo(self):
-        """Rehace la última acción deshecha."""
+        """Rehace la última acción deshecha"""
         state_manager.redo()
         self._sincronizar_con_estado()
         messagebox.showinfo("↪️ Rehacer", "Acción rehecha")
 
     def _sincronizar_con_estado(self):
-        """Sincroniza la UI con el estado actual."""
+        """Sincroniza la UI con el estado actual"""
         current_state = state_manager.get_state()
         
         # Actualizar referencias
@@ -975,7 +976,7 @@ class ProyectoAcademicoGenerator:
     # ========== MÉTODOS DE REFERENCIAS ==========
 
     def agregar_referencia(self):
-        """Versión actualizada usando state manager."""
+        """Agrega una referencia a la lista"""
         # Recopilar datos del formulario
         if all([
             hasattr(self, 'ref_tipo'),
@@ -991,27 +992,29 @@ class ProyectoAcademicoGenerator:
                 'titulo': self.ref_titulo.get().strip(),
                 'fuente': self.ref_fuente.get().strip()
             }
-            try:
-                # Usar el reference_manager para validar
-                ref_validada = self.reference_manager.agregar_referencia(ref_data)
-                
-                # Actualizar estado global
-                state_manager.add_referencia(ref_validada)
-                
-                # Actualizar UI local
-                self.referencias = state_manager.get_state().referencias
-                self.actualizar_lista_referencias()
-                
-                # Limpiar campos
-                self.ref_autor.delete(0, "end")
-                self.ref_año.delete(0, "end")
-                self.ref_titulo.delete(0, "end")
-                self.ref_fuente.delete(0, "end")
-                
-                messagebox.showinfo("✅ Agregada", "Referencia agregada correctamente")
-                
-            except ValueError as e:
-                messagebox.showerror("❌ Error", str(e))
+            
+            # Validar campos requeridos
+            if not all([ref_data['autor'], ref_data['año'], ref_data['titulo'], ref_data['fuente']]):
+                messagebox.showerror("❌ Error", "Todos los campos son obligatorios")
+                return
+            
+            # Agregar a la lista
+            self.referencias.append(ref_data)
+            
+            # Actualizar lista visual
+            self.actualizar_lista_referencias()
+            
+            # Limpiar campos
+            self.ref_autor.delete(0, "end")
+            self.ref_año.delete(0, "end")
+            self.ref_titulo.delete(0, "end")
+            self.ref_fuente.delete(0, "end")
+            
+            # Actualizar contador
+            if hasattr(self, 'ref_stats_label'):
+                self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
+            
+            messagebox.showinfo("✅ Agregada", "Referencia agregada correctamente")
 
     def actualizar_lista_referencias(self):
         """Actualiza la lista visual de referencias"""
@@ -1892,10 +1895,9 @@ class ProyectoAcademicoGenerator:
         if dialog.result:
             seccion_id, seccion_data = dialog.result
             try:
-                # Usar el section_manager
-                self.section_manager.agregar_seccion(seccion_id, seccion_data)
-                self.secciones_disponibles = self.section_manager.secciones_disponibles
-                self.secciones_activas = self.section_manager.secciones_activas
+                # Agregar a secciones disponibles
+                self.secciones_disponibles[seccion_id] = seccion_data
+                self.secciones_activas.append(seccion_id)
                 
                 # Actualizar UI
                 self.actualizar_lista_secciones()
@@ -1905,30 +1907,143 @@ class ProyectoAcademicoGenerator:
                 messagebox.showerror("❌ Error", str(e))
     
     def quitar_seccion(self):
-        """Quita secciones seleccionadas"""
-        # Implementación básica
-        pass
-    
+        """Quita la sección seleccionada de las activas"""
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección por el título
+            seccion_id = None
+            for sid, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    seccion_id = sid
+                    break
+            
+            if seccion_id and seccion_id in self.secciones_activas:
+                seccion = self.secciones_disponibles[seccion_id]
+                
+                # Verificar si es requerida
+                if seccion.get('requerida', False):
+                    messagebox.showwarning("⚠️ Sección Requerida", 
+                        "Esta sección es requerida y no puede ser eliminada")
+                    return
+                
+                # Confirmar eliminación
+                if messagebox.askyesno("🗑️ Confirmar", 
+                    f"¿Desactivar la sección '{seccion['titulo']}'?"):
+                    self.secciones_activas.remove(seccion_id)
+                    self.actualizar_lista_secciones()
+                    self.crear_pestanas_contenido()
+                    messagebox.showinfo("✅ Desactivada", "Sección desactivada correctamente")
+
     def editar_seccion(self):
-        """Edita una sección existente"""
-        # Implementación básica
-        pass
-    
+        """Edita la sección actual"""
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección
+            seccion_id = None
+            for sid, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    seccion_id = sid
+                    break
+            
+            if seccion_id:
+                from .dialogs import SeccionDialog
+                
+                dialog = SeccionDialog(
+                    self.root, 
+                    self.secciones_disponibles,
+                    editar=True,
+                    seccion_actual=(seccion_id, self.secciones_disponibles[seccion_id])
+                )
+                
+                self.root.wait_window(dialog.dialog)
+                
+                if dialog.result:
+                    _, seccion_data = dialog.result
+                    self.secciones_disponibles[seccion_id].update(seccion_data)
+                    self.actualizar_lista_secciones()
+                    self.crear_pestanas_contenido()
+                    messagebox.showinfo("✅ Actualizada", "Sección actualizada correctamente")
+
     def subir_seccion(self):
-        """Sube una sección en el orden"""
-        # Implementación básica
-        pass
-    
+        """Sube la sección actual en el orden"""
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección
+            for seccion_id, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    if seccion_id in self.secciones_activas:
+                        index = self.secciones_activas.index(seccion_id)
+                        if index > 0:
+                            # Intercambiar con la anterior
+                            self.secciones_activas[index], self.secciones_activas[index-1] = \
+                                self.secciones_activas[index-1], self.secciones_activas[index]
+                            self.actualizar_lista_secciones()
+                            self.crear_pestanas_contenido()
+                            # Mantener la pestaña actual seleccionada
+                            self.content_tabview.set(current_tab)
+                    break
+
     def bajar_seccion(self):
-        """Baja una sección en el orden"""
-        # Implementación básica
-        pass
-    
-    # Métodos de referencias
+        """Baja la sección actual en el orden"""
+        if hasattr(self, 'content_tabview') and self.content_tabview._tab_dict:
+            current_tab = self.content_tabview.get()
+            
+            # Buscar el ID de la sección
+            for seccion_id, seccion in self.secciones_disponibles.items():
+                if seccion['titulo'] == current_tab:
+                    if seccion_id in self.secciones_activas:
+                        index = self.secciones_activas.index(seccion_id)
+                        if index < len(self.secciones_activas) - 1:
+                            # Intercambiar con la siguiente
+                            self.secciones_activas[index], self.secciones_activas[index+1] = \
+                                self.secciones_activas[index+1], self.secciones_activas[index]
+                            self.actualizar_lista_secciones()
+                            self.crear_pestanas_contenido()
+                            # Mantener la pestaña actual seleccionada
+                            self.content_tabview.set(current_tab)
+                    break
     def agregar_referencia(self):
-        """Agrega una referencia a la lista"""
-        # Implementación básica
-        pass
+        """Versión actualizada usando state manager"""
+        # Recopilar datos del formulario
+        if all([
+            hasattr(self, 'ref_tipo'),
+            hasattr(self, 'ref_autor'),
+            hasattr(self, 'ref_año'),
+            hasattr(self, 'ref_titulo'),
+            hasattr(self, 'ref_fuente')
+        ]):
+            ref_data = {
+                'tipo': self.ref_tipo.get(),
+                'autor': self.ref_autor.get().strip(),
+                'año': self.ref_año.get().strip(),
+                'titulo': self.ref_titulo.get().strip(),
+                'fuente': self.ref_fuente.get().strip()
+            }
+            
+            try:
+                # Usar el reference_manager para validar
+                ref_validada = self.reference_manager.agregar_referencia(ref_data)
+                
+                # Actualizar estado global
+                state_manager.add_referencia(ref_validada)
+                
+                # Actualizar UI local
+                self.referencias = state_manager.get_state().referencias
+                self.actualizar_lista_referencias()
+                
+                # Limpiar campos
+                self.ref_autor.delete(0, "end")
+                self.ref_año.delete(0, "end")
+                self.ref_titulo.delete(0, "end")
+                self.ref_fuente.delete(0, "end")
+                
+                messagebox.showinfo("✅ Agregada", "Referencia agregada correctamente")
+                
+            except ValueError as e:
+                messagebox.showerror("❌ Error", str(e))
     
     def actualizar_lista_referencias(self):
         """Actualiza la lista visual de referencias"""
