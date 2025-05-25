@@ -72,3 +72,13 @@ TEXT_LIMITS = {
     'palabras_proyecto_min': 3000,
     'palabras_proyecto_max': 10000
 }
+# En config/settings.py agregar:
+UI_COLORS = {
+    'primary': '#4682B4',
+    'success': '#228B22',
+    'danger': '#DC143C',
+    'warning': '#FFA500',
+    'info': '#4B0082',
+    'dark': '#191970',
+    'light': '#F0F0F0'
+}

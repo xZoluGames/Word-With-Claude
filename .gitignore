@@ -22,3 +22,6 @@ auto_save.json
 
 # Imágenes temporales
 temp_images
+
+# Word
+.docx
