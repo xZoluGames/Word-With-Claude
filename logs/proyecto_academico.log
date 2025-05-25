@@ -20,3 +20,22 @@
 2025-05-24 22:36:43,662 - ProyectoAcademico.ReferenceManager - INFO - Inicializando ReferenceManager
 2025-05-24 22:36:43,662 - ProyectoAcademico.MainWindow - INFO - StateManager integrado
 2025-05-24 22:36:44,628 - ProyectoAcademico.ProjectManager - INFO - Auto-guardado realizado - Hash: 2a6ad9aa
+2025-05-24 22:47:25,318 - ProyectoAcademico.CacheSystem - INFO - CacheManager inicializado - Dir: cache
+2025-05-24 22:47:25,419 - ProyectoAcademico.WatermarkManager - INFO - WatermarkManager inicializado
+2025-05-24 22:47:25,419 - ProyectoAcademico.ReferenceManager - INFO - Inicializando ReferenceManager
+2025-05-24 22:47:25,419 - ProyectoAcademico.MainWindow - INFO - StateManager integrado
+2025-05-24 22:47:26,412 - ProyectoAcademico.ProjectManager - INFO - Auto-guardado realizado - Hash: b108e6e9
+2025-05-24 22:49:07,048 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: 
+2025-05-24 22:49:19,158 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:49:28,550 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:49:44,985 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:49:55,441 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:50:02,022 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:50:08,918 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:50:13,094 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:50:39,869 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:50:42,937 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganador
+2025-05-24 22:50:47,166 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
+2025-05-24 22:50:49,443 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
+2025-05-24 22:51:01,845 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
+2025-05-24 22:51:04,152 - ProyectoAcademico.ReferenceManager - DEBUG - Agregando referencia: Ganadorasasd
