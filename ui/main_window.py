@@ -249,6 +249,7 @@ class ProyectoAcademicoGenerator:
     
     def _create_header_buttons(self, parent):
             """Crea los botones del header"""
+            from config.settings import UI_COLORS, BUTTON_COLORS
             button_frame = ctk.CTkFrame(parent, fg_color="transparent")
             button_frame.pack(fill="x", padx=20, pady=(5, 10))
             
@@ -258,10 +259,10 @@ class ProyectoAcademicoGenerator:
             
             # Botones de la primera fila - corregidos para evitar errores de color
             buttons_row1 = [
-                ("📖 Guía", self.mostrar_instrucciones, None, None, 80),  # Color por defecto
-                ("📋 Plantilla", self.cargar_documento_base, "#9370DB", "#7B68EE", 90),  # Purple colors
-                ("💾 Guardar", self.guardar_proyecto, "#228B22", "#006400", 80),  # Forest green
-                ("📂 Cargar", self.cargar_proyecto, "#4682B4", "#191970", 80)  # Steel blue
+                ("📖 Guía", self.mostrar_instrucciones, None, None, 80),
+                ("📋 Plantilla", self.cargar_documento_base, BUTTON_COLORS['purple'], BUTTON_COLORS['darkpurple'], 90),
+                ("💾 Guardar", self.guardar_proyecto, BUTTON_COLORS['green'], BUTTON_COLORS['darkgreen'], 80),
+                ("📂 Cargar", self.cargar_proyecto, BUTTON_COLORS['blue'], BUTTON_COLORS['darkblue'], 80)
             ]
             
             for text, command, fg_color, hover_color, width in buttons_row1:
@@ -287,10 +288,10 @@ class ProyectoAcademicoGenerator:
             
             # Botones de la segunda fila - corregidos
             buttons_row2 = [
-                ("🖼️ Imágenes", self.gestionar_imagenes, "#4682B4", "#191970", 90),  # Steel blue
-                ("📤 Exportar Config", self.exportar_configuracion, "#FF8C00", "#FF6347", 110),  # Dark orange
-                ("🔍 Validar", self.validar_proyecto, "#FFA500", "#FF8C00", 80),  # Orange
-                ("🗂️ Plantillas", self.gestionar_plantillas, "#4B0082", "#6A0DAD", 90)  # Indigo valid colors
+                ("🖼️ Imágenes", self.gestionar_imagenes, BUTTON_COLORS['blue'], BUTTON_COLORS['darkblue'], 90),
+                ("📤 Exportar Config", self.exportar_configuracion, BUTTON_COLORS['orange'], BUTTON_COLORS['darkorange'], 110),
+                ("🔍 Validar", self.validar_proyecto, BUTTON_COLORS['orange'], BUTTON_COLORS['darkorange'], 80),
+                ("🗂️ Plantillas", self.gestionar_plantillas, BUTTON_COLORS['indigo'], BUTTON_COLORS['darkindigo'], 90)
             ]
             
             for text, command, fg_color, hover_color, width in buttons_row2:
@@ -309,7 +310,8 @@ class ProyectoAcademicoGenerator:
                 command=self.generar_documento_async,
                 width=140, height=30, 
                 font=self.font_manager.get_font("small", "bold"),
-                fg_color="#228B22", hover_color="#006400"  # Forest green
+                fg_color=BUTTON_COLORS['green'], 
+                hover_color=BUTTON_COLORS['darkgreen']
             )
             self.generate_btn.pack(side="right", padx=(5, 0))
             

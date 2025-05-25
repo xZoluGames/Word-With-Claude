@@ -143,3 +143,4 @@ temp_images/
 *.doc
 exports/
 backup/
+logs/proyecto_academico.log

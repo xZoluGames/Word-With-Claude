@@ -4,3 +4,14 @@
 2025-05-24 21:41:12,544 - ProyectoAcademico.CacheSystem - INFO - CacheManager inicializado - Dir: cache
 2025-05-24 21:44:03,520 - ProyectoAcademico.CacheSystem - INFO - CacheManager inicializado - Dir: cache
 2025-05-24 21:46:45,453 - ProyectoAcademico.CacheSystem - INFO - CacheManager inicializado - Dir: cache
+2025-05-24 22:30:05,516 - ProyectoAcademico.CacheSystem - INFO - CacheManager inicializado - Dir: cache
+2025-05-24 22:30:05,633 - ProyectoAcademico.WatermarkManager - INFO - WatermarkManager inicializado
+2025-05-24 22:30:05,633 - ProyectoAcademico.ReferenceManager - INFO - Inicializando ReferenceManager
+2025-05-24 22:30:05,633 - ProyectoAcademico.MainWindow - INFO - StateManager integrado
+2025-05-24 22:32:27,211 - ProyectoAcademico.CacheSystem - INFO - CacheManager inicializado - Dir: cache
+2025-05-24 22:32:27,315 - ProyectoAcademico.WatermarkManager - INFO - WatermarkManager inicializado
+2025-05-24 22:32:27,316 - ProyectoAcademico.ReferenceManager - INFO - Inicializando ReferenceManager
+2025-05-24 22:32:27,316 - ProyectoAcademico.MainWindow - INFO - StateManager integrado
+2025-05-24 22:32:28,241 - ProyectoAcademico.ProjectManager - INFO - Auto-guardado realizado - Hash: 838d92bc
+2025-05-24 22:34:02,312 - ProyectoAcademico.WatermarkManager - DEBUG - Configurando imagen detrás del texto
+2025-05-24 22:34:02,313 - ProyectoAcademico.WatermarkManager - DEBUG - Imagen configurada detrás del texto exitosamente

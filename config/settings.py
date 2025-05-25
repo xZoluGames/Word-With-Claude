@@ -72,13 +72,41 @@ TEXT_LIMITS = {
     'palabras_proyecto_min': 3000,
     'palabras_proyecto_max': 10000
 }
-# En config/settings.py agregar:
+# Colores de la interfaz
 UI_COLORS = {
-    'primary': '#4682B4',
-    'success': '#228B22',
-    'danger': '#DC143C',
-    'warning': '#FFA500',
-    'info': '#4B0082',
-    'dark': '#191970',
-    'light': '#F0F0F0'
+    'primary': '#4682B4',      # Steel Blue
+    'success': '#228B22',      # Forest Green
+    'danger': '#DC143C',       # Crimson
+    'warning': '#FFA500',      # Orange
+    'info': '#4B0082',         # Indigo
+    'purple': '#9370DB',       # Medium Purple
+    'dark': '#191970',         # Midnight Blue
+    'light': '#F0F0F0',        # Light Gray
+    'background': {
+        'dark': '#212121',
+        'medium': '#424242',
+        'light': '#616161'
+    },
+    'text': {
+        'primary': '#FFFFFF',
+        'secondary': '#B0B0B0',
+        'disabled': '#707070'
+    }
+}
+
+# Reemplazar BUTTON_COLORS con colores válidos
+BUTTON_COLORS = {
+    'default': None,
+    'green': '#228B22',        # Forest Green
+    'darkgreen': '#006400',    # Dark Green
+    'blue': '#4682B4',         # Steel Blue  
+    'darkblue': '#191970',     # Midnight Blue
+    'purple': '#9370DB',       # Medium Purple
+    'darkpurple': '#6A0DAD',   # Valid dark purple
+    'orange': '#FF8C00',       # Dark Orange
+    'darkorange': '#FF6347',   # Tomato
+    'red': '#DC143C',          # Crimson
+    'darkred': '#8B0000',      # Dark Red
+    'indigo': '#4B0082',       # Indigo
+    'darkindigo': '#310062'    # Dark Indigo
 }
