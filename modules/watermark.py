@@ -5,6 +5,7 @@ Incluye configuraciones específicas de posición y tamaño
 """
 
 import os
+from typing import Optional
 from PIL import Image, ImageEnhance
 from docx import Document
 from docx.shared import Inches, Pt, Cm
