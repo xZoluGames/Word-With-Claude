@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("preview_window")
+
 """
 Preview Window - Ventana de vista previa del documento
 """

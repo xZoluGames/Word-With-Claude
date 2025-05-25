@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("formato_avanzado")
+
 """
 Tab de Formato Avanzado - Configuración de estilos del documento
 """

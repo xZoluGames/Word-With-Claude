@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("document_generator")
+
 """
 Generador de documentos Word - Versión Corregida con Encabezados como Marca de Agua y sangría APA perfecta
 """

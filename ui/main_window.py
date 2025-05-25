@@ -8,7 +8,7 @@ import threading
 import os
 from datetime import datetime
 from PIL import Image
-
+from core.state_manager import state_manager
 # Imports de módulos internos
 from core.project_manager import ProjectManager
 from core.document_generator import DocumentGenerator
@@ -33,7 +33,7 @@ class ProyectoAcademicoGenerator:
         self.root.title("🎓 Generador de Proyectos Académicos - Versión Avanzada")
         self.root.geometry("1200x700")
         self.root.minsize(1000, 600)
-        
+        self._init_state_manager()
         # Inicializar gestores y componentes
         self._init_managers()
         self._init_variables()
@@ -49,7 +49,30 @@ class ProyectoAcademicoGenerator:
         self.mostrar_bienvenida()
         self.actualizar_estadisticas()
         self.project_manager.auto_save_project(self)
-    
+    def _init_state_manager(self):
+        """Inicializa y configura el gestor de estado centralizado."""
+        from utils.logger import get_logger
+        logger = get_logger('MainWindow')
+        
+        # Cargar estado inicial
+        initial_state = {
+            'formato_config': self.formato_config,
+            'secciones_disponibles': self.secciones_disponibles,
+            'secciones_activas': self.secciones_activas
+        }
+        
+        state_manager.update_state(**initial_state)
+        
+        # Suscribir a cambios de estado
+        state_manager.subscribe(self._on_state_change)
+        
+        logger.info("StateManager integrado")
+
+    def _on_state_change(self, new_state):
+        """Callback cuando cambia el estado global."""
+        # Actualizar UI según los cambios
+        # Por ejemplo, actualizar estadísticas
+        self.actualizar_estadisticas()
     def _init_managers(self):
         """Inicializa los gestores y procesadores"""
         from template_manager import obtener_template_manager
@@ -356,11 +379,14 @@ class ProyectoAcademicoGenerator:
         ) if hasattr(self, 'zoom_label') else None
     
     def setup_keyboard_shortcuts(self):
-        """Configura atajos de teclado principales"""
+        """Versión actualizada con undo/redo."""
         shortcuts = {
             '<Control-s>': lambda e: self.guardar_proyecto(),
             '<Control-o>': lambda e: self.cargar_proyecto(),
             '<Control-n>': lambda e: self.nuevo_proyecto(),
+            '<Control-z>': lambda e: self.undo(),  # Nuevo
+            '<Control-y>': lambda e: self.redo(),  # Nuevo
+            '<Control-Shift-z>': lambda e: self.redo(),  # Nuevo (alternativo)
             '<F5>': lambda e: self.validar_proyecto(),
             '<F9>': lambda e: self.generar_documento_async(),
             '<Control-q>': lambda e: self.root.quit()
@@ -368,6 +394,41 @@ class ProyectoAcademicoGenerator:
         
         for key, func in shortcuts.items():
             self.root.bind(key, func)
+
+    def undo(self):
+        """Deshace la última acción."""
+        state_manager.undo()
+        self._sincronizar_con_estado()
+        messagebox.showinfo("↩️ Deshacer", "Acción deshecha")
+
+    def redo(self):
+        """Rehace la última acción deshecha."""
+        state_manager.redo()
+        self._sincronizar_con_estado()
+        messagebox.showinfo("↪️ Rehacer", "Acción rehecha")
+
+    def _sincronizar_con_estado(self):
+        """Sincroniza la UI con el estado actual."""
+        current_state = state_manager.get_state()
+        
+        # Actualizar referencias
+        self.referencias = current_state.referencias
+        self.actualizar_lista_referencias()
+        
+        # Actualizar secciones
+        self.secciones_disponibles = current_state.secciones_disponibles
+        self.secciones_activas = current_state.secciones_activas
+        self.actualizar_lista_secciones()
+        self.crear_pestanas_contenido()
+        
+        # Actualizar contenido de secciones
+        for seccion_id, contenido in current_state.contenido_secciones.items():
+            if seccion_id in self.content_texts:
+                self.content_texts[seccion_id].delete("1.0", "end")
+                self.content_texts[seccion_id].insert("1.0", contenido)
+        
+        # Actualizar configuración
+        self.formato_config = current_state.formato_config
     
     # Métodos principales delegados
     def guardar_proyecto(self):
@@ -911,7 +972,7 @@ class ProyectoAcademicoGenerator:
     # ========== MÉTODOS DE REFERENCIAS ==========
 
     def agregar_referencia(self):
-        """Agrega una referencia bibliográfica"""
+        """Versión actualizada usando state manager."""
         # Recopilar datos del formulario
         if all([
             hasattr(self, 'ref_tipo'),
@@ -927,38 +988,27 @@ class ProyectoAcademicoGenerator:
                 'titulo': self.ref_titulo.get().strip(),
                 'fuente': self.ref_fuente.get().strip()
             }
-            
-            # Validar campos requeridos
-            if not all([ref_data['autor'], ref_data['año'], ref_data['titulo']]):
-                messagebox.showerror("❌ Error", "Complete todos los campos obligatorios")
-                return
-            
-            # Validar formato del año
             try:
-                año = int(ref_data['año'])
-                if año < 1900 or año > 2050:
-                    raise ValueError()
-            except:
-                messagebox.showerror("❌ Error", "El año debe ser un número válido entre 1900 y 2050")
-                return
-            
-            # Agregar a la lista
-            self.referencias.append(ref_data)
-            
-            # Actualizar lista visual
-            self.actualizar_lista_referencias()
-            
-            # Limpiar campos
-            self.ref_autor.delete(0, "end")
-            self.ref_año.delete(0, "end")
-            self.ref_titulo.delete(0, "end")
-            self.ref_fuente.delete(0, "end")
-            
-            # Actualizar contador
-            if hasattr(self, 'ref_stats_label'):
-                self.ref_stats_label.configure(text=f"Total: {len(self.referencias)} referencias")
-            
-            messagebox.showinfo("✅ Agregada", "Referencia agregada correctamente")
+                # Usar el reference_manager para validar
+                ref_validada = self.reference_manager.agregar_referencia(ref_data)
+                
+                # Actualizar estado global
+                state_manager.add_referencia(ref_validada)
+                
+                # Actualizar UI local
+                self.referencias = state_manager.get_state().referencias
+                self.actualizar_lista_referencias()
+                
+                # Limpiar campos
+                self.ref_autor.delete(0, "end")
+                self.ref_año.delete(0, "end")
+                self.ref_titulo.delete(0, "end")
+                self.ref_fuente.delete(0, "end")
+                
+                messagebox.showinfo("✅ Agregada", "Referencia agregada correctamente")
+                
+            except ValueError as e:
+                messagebox.showerror("❌ Error", str(e))
 
     def actualizar_lista_referencias(self):
         """Actualiza la lista visual de referencias"""

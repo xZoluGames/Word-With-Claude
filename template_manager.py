@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+from utils.logger import get_logger
+
+logger = get_logger("template_manager")
+
 """
 Template Manager - Gestor de plantillas para proyectos académicos
 Maneja plantillas base, aplicación de formatos predefinidos y gestión de estructuras

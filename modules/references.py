@@ -1,62 +1,152 @@
 """
-Gestión de referencias bibliográficas - Sistema completo de referencias APA
+Ejemplo de cómo deben quedar los archivos con imports limpios y docstrings completos
 """
 
-import customtkinter as ctk
-from tkinter import messagebox
+# modules/references.py - VERSION MEJORADA
+"""
+Gestión de referencias bibliográficas - Sistema completo de referencias APA
+
+Este módulo proporciona funcionalidad completa para gestionar referencias
+bibliográficas siguiendo el formato APA 7ma edición.
+
+Classes:
+    ReferenceManager: Gestor principal de referencias bibliográficas
+
+Example:
+    >>> ref_manager = ReferenceManager()
+    >>> ref_data = {
+    ...     'tipo': 'Libro',
+    ...     'autor': 'García, J.',
+    ...     'año': '2023',
+    ...     'titulo': 'Python Avanzado',
+    ...     'fuente': 'Editorial Tech'
+    ... }
+    >>> ref_manager.agregar_referencia(ref_data)
+"""
+
 import re
 from datetime import datetime
-
+from typing import Dict, List, Tuple, Optional
+from utils.logger import get_logger
+logger = get_logger('ReferenceManager')
 class ReferenceManager:
+    """
+    Gestor de referencias bibliográficas con soporte completo para APA.
+    
+    Attributes:
+        referencias (List[Dict]): Lista de referencias almacenadas
+        tipos_referencia (Dict[str, Dict]): Tipos de referencia soportados
+    
+    Methods:
+        agregar_referencia: Agrega una nueva referencia con validación
+        eliminar_referencia: Elimina una referencia por índice
+        generar_apa_format: Genera formato APA para una referencia
+        ordenar_referencias: Ordena las referencias según criterio
+        buscar_referencias: Busca referencias por término
+    """
     def __init__(self):
-        self.referencias = []
-        self.tipos_referencia = {
+        """Inicializa el gestor de referencias."""
+        logger.info("Inicializando ReferenceManager")
+        self.referencias: List[Dict] = []
+        self.tipos_referencia = self._get_tipos_referencia()
+    
+    def _get_tipos_referencia(self) -> Dict[str, Dict]:
+        """
+        Obtiene los tipos de referencia soportados.
+        
+        Returns:
+            Dict[str, Dict]: Diccionario con tipos de referencia y sus campos
+        """
+        return {
             'Libro': {
                 'campos': ['autor', 'año', 'titulo', 'editorial', 'ciudad'],
-                'formato': '{autor} ({año}). {titulo}. {editorial}.'
+                'formato': '{autor} ({año}). {titulo}. {editorial}.',
+                'campos_requeridos': ['autor', 'año', 'titulo', 'editorial']
             },
             'Artículo': {
                 'campos': ['autor', 'año', 'titulo', 'revista', 'volumen', 'paginas'],
-                'formato': '{autor} ({año}). {titulo}. {revista}, {volumen}, {paginas}.'
+                'formato': '{autor} ({año}). {titulo}. {revista}, {volumen}, {paginas}.',
+                'campos_requeridos': ['autor', 'año', 'titulo', 'revista']
             },
             'Web': {
                 'campos': ['autor', 'año', 'titulo', 'sitio_web', 'url', 'fecha_acceso'],
-                'formato': '{autor} ({año}). {titulo}. {sitio_web}. {url}'
+                'formato': '{autor} ({año}). {titulo}. {sitio_web}. {url}',
+                'campos_requeridos': ['autor', 'año', 'titulo', 'url']
             },
             'Tesis': {
                 'campos': ['autor', 'año', 'titulo', 'tipo_tesis', 'institucion'],
-                'formato': '{autor} ({año}). {titulo} ({tipo_tesis}). {institucion}.'
+                'formato': '{autor} ({año}). {titulo} ({tipo_tesis}). {institucion}.',
+                'campos_requeridos': ['autor', 'año', 'titulo', 'institucion']
             }
         }
     
-    def agregar_referencia(self, ref_data):
-        """Agrega una nueva referencia con validación"""
-        # Validar campos requeridos
-        campos_requeridos = ['autor', 'año', 'titulo']
+    def agregar_referencia(self, ref_data: Dict[str, str]) -> Dict[str, any]:
+        """
+        Agrega una nueva referencia con validación completa.
+        
+        Args:
+            ref_data: Diccionario con los datos de la referencia
+                - tipo (str): Tipo de referencia (Libro, Artículo, etc.)
+                - autor (str): Autor(es) en formato APA
+                - año (str): Año de publicación
+                - titulo (str): Título de la obra
+                - fuente (str): Editorial, revista, URL, etc.
+        
+        Returns:
+            Dict: La referencia agregada con ID y metadatos
+        
+        Raises:
+            ValueError: Si faltan campos requeridos o el formato es inválido
+        
+        Example:
+            >>> ref_data = {
+            ...     'tipo': 'Libro',
+            ...     'autor': 'García, J.',
+            ...     'año': '2023',
+            ...     'titulo': 'Python Avanzado',
+            ...     'fuente': 'Editorial Tech'
+            ... }
+            >>> ref = ref_manager.agregar_referencia(ref_data)
+        """
+        logger.debug(f"Agregando referencia: {ref_data.get('titulo', 'Sin título')}")
+        
+        # Validar tipo
+        tipo = ref_data.get('tipo', 'Libro')
+        if tipo not in self.tipos_referencia:
+            raise ValueError(f"Tipo de referencia no válido: {tipo}")
+        
+        # Validar campos requeridos según el tipo
+        campos_requeridos = self.tipos_referencia[tipo].get('campos_requeridos', ['autor', 'año', 'titulo'])
         for campo in campos_requeridos:
-            if not ref_data.get(campo, '').strip():
-                raise ValueError(f"El campo '{campo}' es requerido")
+            if campo not in ref_data or not ref_data[campo].strip():
+                raise ValueError(f"El campo '{campo}' es requerido para referencias tipo {tipo}")
         
         # Validar año
         try:
             año = int(ref_data['año'])
             if año < 1800 or año > datetime.now().year + 1:
-                raise ValueError("Año inválido")
+                raise ValueError("Año fuera de rango válido")
         except ValueError:
-            raise ValueError("El año debe ser un número válido")
+            raise ValueError("El año debe ser un número válido entre 1800 y el año actual")
         
         # Validar formato del autor
         if not self._validar_formato_autor(ref_data['autor']):
-            raise ValueError("Formato de autor incorrecto. Use: 'Apellido, N.' o 'Apellido, N. M.'")
+            raise ValueError(
+                "Formato de autor incorrecto. Use: 'Apellido, N.' o 'Apellido, N. M.' "
+                "o 'Apellido1, N. y Apellido2, M.'"
+            )
         
-        # Crear referencia
+        # Crear referencia con metadatos
         referencia = {
             'id': len(self.referencias) + 1,
             'fecha_agregada': datetime.now().isoformat(),
+            'tipo': tipo,
             **ref_data
         }
         
         self.referencias.append(referencia)
+        logger.info(f"Referencia agregada: ID={referencia['id']}, Tipo={tipo}")
+        
         return referencia
     
     def eliminar_referencia(self, index=-1):

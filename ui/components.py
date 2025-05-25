@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("components")
+
 """
 Componentes - Componentes reutilizables para la interfaz de usuario
 """

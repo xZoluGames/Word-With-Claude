@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+from utils.logger import get_logger
+
+logger = get_logger("main")
+
 """
 Generador de Proyectos Académicos - Punto de entrada principal
 """

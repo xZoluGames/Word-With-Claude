@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("citations")
+
 """
 Sistema de citas mejorado - Procesamiento avanzado de citas académicas APA
 """

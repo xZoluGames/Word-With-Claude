@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("info_general")
+
 """
 Tab de Información General - Datos básicos del proyecto
 """

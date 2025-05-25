@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("contenido_dinamico")
+
 """
 Tab de Contenido Dinámico - Gestión de secciones y contenido
 """

@@ -12,7 +12,8 @@ class ProjectManager:
     def __init__(self):
         self.auto_save_enabled = True
         self.last_save_time = None
-        
+        self.last_save_hash = None  # Nuevo: hash del último guardado
+
     def guardar_proyecto(self, app_instance):
         """Guarda el proyecto completo en un archivo JSON"""
         try:
@@ -152,42 +153,55 @@ class ProjectManager:
             messagebox.showinfo("🆕 Nuevo Proyecto", "Proyecto nuevo creado")
     
     def auto_save_project(self, app_instance):
-        """Guarda automáticamente el proyecto"""
-        if self.auto_save_enabled:
-            try:
-                script_dir = os.path.dirname(os.path.abspath(__file__))
-                auto_save_path = os.path.join(script_dir, "..", "auto_save.json")
-                auto_save_path = os.path.normpath(auto_save_path)
+            """Guarda automáticamente el proyecto solo si hay cambios"""
+            if self.auto_save_enabled:
+                try:
+                    from utils.logger import get_logger
+                    logger = get_logger('ProjectManager')
+                    
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    auto_save_path = os.path.join(script_dir, "..", "auto_save.json")
+                    auto_save_path = os.path.normpath(auto_save_path)
+                    
+                    # Crear backup automático
+                    proyecto_completo = {
+                        'version': '2.0',
+                        'fecha_auto_save': datetime.now().isoformat(),
+                        'informacion_general': {},
+                        'contenido_secciones': {},
+                        'referencias': app_instance.referencias,
+                        'secciones_activas': app_instance.secciones_activas,
+                        'formato_config': app_instance.formato_config
+                    }
+                    
+                    # Guardar información
+                    for key, entry in app_instance.proyecto_data.items():
+                        if hasattr(entry, 'get'):
+                            proyecto_completo['informacion_general'][key] = entry.get()
+                    
+                    for key, text_widget in app_instance.content_texts.items():
+                        proyecto_completo['contenido_secciones'][key] = text_widget.get("1.0", "end")
+                    
+                    # Calcular hash del contenido actual
+                    content_str = json.dumps(proyecto_completo, sort_keys=True)
+                    current_hash = hashlib.md5(content_str.encode()).hexdigest()
+                    
+                    # Solo guardar si hay cambios
+                    if current_hash != self.last_save_hash:
+                        with open(auto_save_path, 'w', encoding='utf-8') as f:
+                            json.dump(proyecto_completo, f, ensure_ascii=False, indent=2)
+                        
+                        self.last_save_hash = current_hash
+                        self.last_save_time = datetime.now()
+                        logger.info(f"Auto-guardado realizado - Hash: {current_hash[:8]}")
+                    else:
+                        logger.debug("Auto-guardado omitido - Sin cambios")
+                    
+                except Exception as e:
+                    logger.error(f"Error en auto-guardado: {e}")
                 
-                # Crear backup automático
-                proyecto_completo = {
-                    'version': '2.0',
-                    'fecha_auto_save': datetime.now().isoformat(),
-                    'informacion_general': {},
-                    'contenido_secciones': {},
-                    'referencias': app_instance.referencias,
-                    'secciones_activas': app_instance.secciones_activas,
-                    'formato_config': app_instance.formato_config
-                }
-                
-                # Guardar información
-                for key, entry in app_instance.proyecto_data.items():
-                    if hasattr(entry, 'get'):
-                        proyecto_completo['informacion_general'][key] = entry.get()
-                
-                for key, text_widget in app_instance.content_texts.items():
-                    proyecto_completo['contenido_secciones'][key] = text_widget.get("1.0", "end")
-                
-                with open(auto_save_path, 'w', encoding='utf-8') as f:
-                    json.dump(proyecto_completo, f, ensure_ascii=False, indent=2)
-                
-                print(f"Auto-guardado realizado: {datetime.now().strftime('%H:%M:%S')}")
-                
-            except Exception as e:
-                print(f"Error en auto-guardado: {e}")
-            
-            # Programar próximo auto-guardado
-            app_instance.root.after(300000, lambda: self.auto_save_project(app_instance))  # 5 minutos
+                # Programar próximo auto-guardado
+                app_instance.root.after(300000, lambda: self.auto_save_project(app_instance))  # 5 minutos
     
     def exportar_configuracion(self, app_instance):
         """Exporta solo la configuración de formato"""

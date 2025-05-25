@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("__init__")
+
 """
 Modules - Módulos especializados del generador de proyectos académicos
 """

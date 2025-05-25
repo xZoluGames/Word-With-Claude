@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("dialogs")
+
 """
 Diálogos - Ventanas de diálogo para el generador de proyectos académicos
 """

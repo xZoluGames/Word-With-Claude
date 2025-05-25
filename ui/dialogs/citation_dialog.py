@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("citation_dialog")
+
 """
 Citation Dialog - Diálogo para insertar citas
 """

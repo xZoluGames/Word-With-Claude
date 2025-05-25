@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("font_manager")
+
 """
 Font Manager - Gestión de fuentes para accesibilidad y diseño responsivo
 """

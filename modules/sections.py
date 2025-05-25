@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("sections")
+
 """
 Gestión dinámica de secciones - Sistema completo de administración de secciones
 """

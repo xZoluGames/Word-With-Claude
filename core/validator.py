@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("validator")
+
 """
 Validador de proyectos - Valida completitud y calidad del proyecto académico
 """

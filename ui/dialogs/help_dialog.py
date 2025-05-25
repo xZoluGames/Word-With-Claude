@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("help_dialog")
+
 """
 Help Dialog - Diálogo de ayuda y guías
 """

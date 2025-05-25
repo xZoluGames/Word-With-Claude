@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("tooltip")
+
 """
 ToolTip Widget - Tooltips para widgets de CustomTkinter
 """

@@ -13,153 +13,206 @@ from docx.oxml.ns import qn
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 import io
 import base64
-
+from utils.logger import get_logger
+from utils.cache import cached, image_cache
+from config.settings import RESOURCES_PATHS
+logger = get_logger('WatermarkManager')
 class WatermarkManager:
+    """
+    Gestor de marcas de agua con cache integrado.
+    
+    Mejoras implementadas:
+    - Cache de imágenes procesadas
+    - Logging de operaciones
+    - Configuración desde settings
+    """
     def __init__(self):
         self.default_opacity = 0.3
         self.default_position = 'header'
-        self.cache = {}
         
-        # Configuración del encabezado (páginas 2 en adelante)
+        # Configuración del encabezado
         self.header_config = {
             'width': Cm(20),
             'height': Cm(27.75),
-            'h_align': 'center',      # Centrado horizontalmente
-            'v_position': Cm(-1.16),   # -1.5 cm desde el párrafo
-            'behind_text': True       # Detrás del texto
+            'h_align': 'center',
+            'v_position': Cm(-1.16),
+            'behind_text': True
         }
         
-        # Configuración de la insignia (solo primera página)
+        # Configuración de la insignia
         self.logo_config = {
             'width': Cm(4.36),
             'height': Cm(5.33),
-            'align': 'center'  # Centrada
+            'align': 'center'
         }
         
-    def process_image_for_watermark(self, image_path, opacity=None, width_inches=None):
-        """Procesa una imagen para usarla como marca de agua"""
+        logger.info("WatermarkManager inicializado")
+        
+    @cached(ttl=86400, key_prefix="watermark")  # Cache por 24 horas
+    def process_image_for_watermark(self, image_path: str, opacity: float = None, 
+                                  width_inches: float = None) -> Optional[bytes]:
+        """
+        Procesa una imagen para usarla como marca de agua con cache.
+        
+        Args:
+            image_path: Ruta de la imagen
+            opacity: Opacidad (0.0-1.0)
+            width_inches: Ancho en pulgadas
+            
+        Returns:
+            bytes: Imagen procesada o None si hay error
+        """
+        logger.debug(f"Procesando imagen para marca de agua: {image_path}")
+        
         if opacity is None:
             opacity = self.default_opacity
-            
-        cache_key = f"{image_path}_{opacity}_{width_inches}"
-        if cache_key in self.cache:
-            return self.cache[cache_key]
         
         try:
+            # Verificar que el archivo existe
+            if not os.path.exists(image_path):
+                logger.error(f"Archivo no encontrado: {image_path}")
+                return None
+            
             # Abrir imagen
             img = Image.open(image_path)
+            logger.debug(f"Imagen abierta: {img.size}, modo: {img.mode}")
             
             # Convertir a RGBA si es necesario
             if img.mode != 'RGBA':
                 img = img.convert('RGBA')
+                logger.debug("Imagen convertida a RGBA")
             
             # Redimensionar si se especifica ancho
             if width_inches:
-                # Convertir pulgadas a píxeles (asumiendo 96 DPI)
+                # Convertir pulgadas a píxeles (96 DPI)
                 width_px = int(width_inches * 96)
                 ratio = width_px / img.width
                 height_px = int(img.height * ratio)
                 img = img.resize((width_px, height_px), Image.Resampling.LANCZOS)
+                logger.debug(f"Imagen redimensionada a: {width_px}x{height_px}")
             
             # Aplicar transparencia
-            if img.mode == 'RGBA':
-                # Procesar canal alpha
-                alpha = img.split()[-1]
-                alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
-                img.putalpha(alpha)
-            else:
-                # Si no tiene alpha, crear uno
-                img = img.convert('RGBA')
-                data = img.getdata()
-                newData = []
-                for item in data:
-                    # Cambiar todos los píxeles blancos (o casi blancos) a transparentes
-                    if len(item) == 4:
-                        newData.append((item[0], item[1], item[2], int(item[3] * opacity)))
-                    else:
-                        newData.append((item[0], item[1], item[2], int(255 * opacity)))
-                img.putdata(newData)
+            alpha = img.split()[-1]
+            alpha = ImageEnhance.Brightness(alpha).enhance(opacity)
+            img.putalpha(alpha)
+            logger.debug(f"Transparencia aplicada: {opacity}")
             
             # Guardar en memoria
             buffer = io.BytesIO()
             img.save(buffer, format='PNG')
             buffer.seek(0)
             
-            self.cache[cache_key] = buffer.getvalue()
-            return self.cache[cache_key]
+            result = buffer.getvalue()
+            logger.info(f"Imagen procesada exitosamente: {len(result)} bytes")
+            
+            return result
             
         except Exception as e:
-            print(f"Error procesando imagen para marca de agua: {e}")
+            logger.error(f"Error procesando imagen para marca de agua: {e}", exc_info=True)
             return None
     
-    def configurar_imagen_detras_texto(self, picture, config=None):
-        """Configura una imagen para que aparezca detrás del texto con posición específica"""
+    def configurar_imagen_detras_texto(self, picture, config: dict = None):
+        """
+        Configura una imagen para que aparezca detrás del texto.
+        
+        Args:
+            picture: Objeto imagen de python-docx
+            config: Configuración de posición
+        """
+        logger.debug("Configurando imagen detrás del texto")
+        
         if config is None:
             config = self.header_config
-            
-        inline = picture._inline
         
-        # Crear elemento anchor
-        anchor = OxmlElement('wp:anchor')
-        
-        # Atributos básicos
-        anchor.set('distT', '0')
-        anchor.set('distB', '0')
-        anchor.set('distL', '0')
-        anchor.set('distR', '0')
-        anchor.set('simplePos', '0')
-        anchor.set('relativeHeight', '0')
-        anchor.set('behindDoc', '1')  # Detrás del texto
-        anchor.set('locked', '0')
-        anchor.set('layoutInCell', '1')
-        anchor.set('allowOverlap', '1')
-        
-        # Posición simple (requerida)
-        simplePos = OxmlElement('wp:simplePos')
-        simplePos.set('x', '0')
-        simplePos.set('y', '0')
-        anchor.append(simplePos)
-        
-        # Posición horizontal - Centrada con relación a página
-        positionH = OxmlElement('wp:positionH')
-        positionH.set('relativeFrom', 'page')
-        alignH = OxmlElement('wp:align')
-        alignH.text = 'center'
-        positionH.append(alignH)
-        anchor.append(positionH)
-        
-        # Posición vertical - Absoluta desde párrafo
-        positionV = OxmlElement('wp:positionV')
-        positionV.set('relativeFrom', 'paragraph')
-        posOffsetV = OxmlElement('wp:posOffset')
-        posOffsetV.text = str(int(config.get('v_position', Cm(-1.5))))
-        positionV.append(posOffsetV)
-        anchor.append(positionV)
-        
-        # Tamaño
-        extent = OxmlElement('wp:extent')
-        extent.set('cx', str(int(config.get('width', Cm(20.96)))))
-        extent.set('cy', str(int(config.get('height', Cm(27.68)))))
-        anchor.append(extent)
-        
-        # Efecto visual (ninguno = detrás del texto)
-        wrapNone = OxmlElement('wp:wrapNone')
-        anchor.append(wrapNone)
-        
-        # Copiar elementos del inline al anchor
-        for element in inline:
-            if element.tag.endswith(('docPr', 'cNvGraphicFramePr', 'graphic')):
-                anchor.append(element)
-                
-        # Reemplazar inline con anchor
-        inline.getparent().replace(inline, anchor)
-    
-    def add_watermark_to_section(self, section, image_path, opacity=0.3, stretch=True):
-        """Agrega marca de agua a una sección del documento con configuración mejorada"""
         try:
+            inline = picture._inline
+            
+            # Crear elemento anchor
+            anchor = OxmlElement('wp:anchor')
+            
+            # Atributos básicos
+            anchor.set('distT', '0')
+            anchor.set('distB', '0')
+            anchor.set('distL', '0')
+            anchor.set('distR', '0')
+            anchor.set('simplePos', '0')
+            anchor.set('relativeHeight', '0')
+            anchor.set('behindDoc', '1')  # Detrás del texto
+            anchor.set('locked', '0')
+            anchor.set('layoutInCell', '1')
+            anchor.set('allowOverlap', '1')
+            
+            # Posición simple (requerida)
+            simplePos = OxmlElement('wp:simplePos')
+            simplePos.set('x', '0')
+            simplePos.set('y', '0')
+            anchor.append(simplePos)
+            
+            # Posición horizontal - Centrada
+            positionH = OxmlElement('wp:positionH')
+            positionH.set('relativeFrom', 'page')
+            alignH = OxmlElement('wp:align')
+            alignH.text = 'center'
+            positionH.append(alignH)
+            anchor.append(positionH)
+            
+            # Posición vertical
+            positionV = OxmlElement('wp:positionV')
+            positionV.set('relativeFrom', 'paragraph')
+            posOffsetV = OxmlElement('wp:posOffset')
+            posOffsetV.text = str(int(config.get('v_position', Cm(-1.5))))
+            positionV.append(posOffsetV)
+            anchor.append(positionV)
+            
+            # Tamaño
+            extent = OxmlElement('wp:extent')
+            extent.set('cx', str(int(config.get('width', Cm(20.96)))))
+            extent.set('cy', str(int(config.get('height', Cm(27.68)))))
+            anchor.append(extent)
+            
+            # Efecto visual
+            wrapNone = OxmlElement('wp:wrapNone')
+            anchor.append(wrapNone)
+            
+            # Copiar elementos del inline al anchor
+            for element in inline:
+                if element.tag.endswith(('docPr', 'cNvGraphicFramePr', 'graphic')):
+                    anchor.append(element)
+            
+            # Reemplazar inline con anchor
+            inline.getparent().replace(inline, anchor)
+            
+            logger.debug("Imagen configurada detrás del texto exitosamente")
+            
+        except Exception as e:
+            logger.error(f"Error configurando imagen detrás del texto: {e}", exc_info=True)
+            raise
+    
+    def add_watermark_to_section(self, section, image_path: str, 
+                               opacity: float = 0.3, stretch: bool = True) -> bool:
+        """
+        Agrega marca de agua a una sección del documento.
+        
+        Args:
+            section: Sección del documento
+            image_path: Ruta de la imagen
+            opacity: Opacidad (0.0-1.0)
+            stretch: Si estirar la imagen
+            
+        Returns:
+            bool: True si se agregó exitosamente
+        """
+        logger.info(f"Agregando marca de agua a sección: {image_path}")
+        
+        try:
+            # Verificar que la imagen existe
+            if not os.path.exists(image_path):
+                logger.error(f"Imagen no encontrada: {image_path}")
+                return False
+            
             # Configurar sección
-            section.header_distance = Cm(1.25)  # Margen del encabezado
-            section.footer_distance = Cm(1.25)  # Margen del pie de página
+            section.header_distance = Cm(1.25)
+            section.footer_distance = Cm(1.25)
             
             # Obtener header
             header = section.header
@@ -176,46 +229,95 @@ class WatermarkManager:
             # Agregar la imagen
             run = header_para.add_run()
             
-            # Usar configuración específica
-            header_pic = run.add_picture(image_path, width=self.header_config['width'])
+            # Usar imagen procesada del cache
+            if stretch:
+                width_cm = self.header_config['width'] / Cm(1)
+                processed_image = self.process_image_for_watermark(
+                    image_path, opacity, width_cm / 2.54
+                )
+                
+                if processed_image:
+                    # Guardar temporalmente para python-docx
+                    import tempfile
+                    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
+                        tmp.write(processed_image)
+                        tmp_path = tmp.name
+                    
+                    try:
+                        header_pic = run.add_picture(tmp_path, width=self.header_config['width'])
+                        os.unlink(tmp_path)  # Limpiar archivo temporal
+                    except Exception as e:
+                        logger.error(f"Error agregando imagen procesada: {e}")
+                        if os.path.exists(tmp_path):
+                            os.unlink(tmp_path)
+                        raise
+                else:
+                    # Usar imagen original si falla el procesamiento
+                    header_pic = run.add_picture(image_path, width=self.header_config['width'])
+            else:
+                header_pic = run.add_picture(image_path, width=self.header_config['width'])
             
             # Configurar posición detrás del texto
             try:
                 self.configurar_imagen_detras_texto(header_pic, self.header_config)
-                print("✅ Encabezado configurado con posicionamiento avanzado")
+                logger.info("✅ Marca de agua agregada con posicionamiento avanzado")
                 return True
             except Exception as e:
-                print(f"⚠️ Error en posicionamiento avanzado: {e}")
-                # Intentar método alternativo
+                logger.warning(f"⚠️ Error en posicionamiento avanzado, usando alternativo: {e}")
                 return self._add_watermark_alternative(header_para, image_path, opacity, stretch)
-                    
+            
         except Exception as e:
-            print(f"Error agregando marca de agua: {e}")
+            logger.error(f"Error agregando marca de agua: {e}", exc_info=True)
             return False
     
-    def add_logo_to_first_page(self, doc, logo_path):
-        """Agrega insignia/logo centrado en la primera página"""
-        if not logo_path or not os.path.exists(logo_path):
-            return False
+    def add_logo_to_first_page(self, doc, logo_path: str) -> bool:
+        """
+        Agrega logo/insignia a la primera página.
+        
+        Args:
+            doc: Documento
+            logo_path: Ruta del logo
             
+        Returns:
+            bool: True si se agregó exitosamente
+        """
+        logger.info(f"Agregando logo a primera página: {logo_path}")
+        
+        if not logo_path or not os.path.exists(logo_path):
+            logger.error(f"Logo no encontrado: {logo_path}")
+            return False
+        
         try:
             # Agregar párrafo para el logo
             logo_para = doc.add_paragraph()
             logo_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
-            # Agregar imagen con configuración específica
+            # Usar imagen del cache si es posible
             logo_run = logo_para.add_run()
             logo_run.add_picture(logo_path, height=self.logo_config['height'])
             
             # Espacio después del logo
             doc.add_paragraph()
             
-            print("✅ Insignia agregada a primera página")
+            logger.info("✅ Logo agregado a primera página")
             return True
             
         except Exception as e:
-            print(f"Error agregando insignia: {e}")
+            logger.error(f"Error agregando logo: {e}", exc_info=True)
             return False
+    
+    def clear_cache(self):
+        """Limpia el cache de imágenes procesadas."""
+        logger.info("Limpiando cache de marcas de agua")
+        
+        # Invalidar cache de funciones decoradas
+        self.process_image_for_watermark.invalidate_cache()
+        
+        # Limpiar cache de imágenes
+        if hasattr(image_cache, 'clear_image_cache'):
+            image_cache.clear_image_cache()
+        
+        logger.info("Cache de marcas de agua limpiado")
     
     def _add_watermark_alternative(self, paragraph, image_path, opacity, stretch):
         """Método alternativo para agregar marca de agua usando XML directo"""

@@ -1,3 +1,8 @@
+
+from utils.logger import get_logger
+
+logger = get_logger("citas_referencias")
+
 """
 Tab de Citas y Referencias - Gestión de citas y bibliografía
 """
