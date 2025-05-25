@@ -33,10 +33,11 @@ class ProyectoAcademicoGenerator:
         self.root.title("🎓 Generador de Proyectos Académicos - Versión Avanzada")
         self.root.geometry("1200x700")
         self.root.minsize(1000, 600)
-        self._init_state_manager()
-        # Inicializar gestores y componentes
+        
+        # MOVER _init_variables() ANTES de _init_state_manager()
+        self._init_variables()  # Mover esta línea aquí
         self._init_managers()
-        self._init_variables()
+        self._init_state_manager()  # Ahora puede acceder a formato_config
         self._init_ui_components()
         
         # Configurar ventana y UI

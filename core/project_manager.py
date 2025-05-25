@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from tkinter import filedialog, messagebox
 from copy import deepcopy
+import hashlib
 
 class ProjectManager:
     def __init__(self):
