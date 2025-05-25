@@ -1,0 +1,27 @@
+# Python
+__pycache__
+.py[cod]
+$py.class
+.so
+
+# Logs
+logs
+.log
+
+# Cache
+cache
+.cache
+
+# Auto-save
+auto_save.json
+
+# IDE
+.vscode
+.idea
+.swp
+
+# Imágenes temporales
+temp_images
+
+# Word
+*.docx
